@@ -29,19 +29,29 @@ export default function PetaBanjarmangu() {
     });
     mapInstanceRef.current = map;
 
-    // Base layer: OpenStreetMap (OSM) standar
-    const osm = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors',
-    });
-    const esriTopo = L.tileLayer(
-      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
+    // 1. CARTO Voyager — Berbasis data OpenStreetMap kontributor (CDN cepat, bebas blokir 403 Tile Usage Policy)
+    const osmVoyager = L.tileLayer(
+      "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
       {
-        attribution: "Tiles &copy; Esri &mdash; Source: Esri, USGS, NOAA",
-        maxZoom: 18,
+        subdomains: "abcd",
+        maxZoom: 19,
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer">CARTO</a>',
       },
     );
+
+    // 2. OpenStreetMap Klasik (via mirror OSM-France — bebas dari blokir 403 volunteer servers OSM Foundation)
+    const osmClassic = L.tileLayer(
+      "https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png",
+      {
+        subdomains: "abc",
+        maxZoom: 19,
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors',
+      },
+    );
+
+    // 3. Citra Satelit (Esri World Imagery)
     const esriSatelit = L.tileLayer(
       "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
       {
@@ -50,10 +60,17 @@ export default function PetaBanjarmangu() {
         maxZoom: 18,
       },
     );
-    osm.addTo(map);
+
+    // Default aktif: CARTO Voyager (OpenStreetMap kontributor)
+    osmVoyager.addTo(map);
+
     L.control
       .layers(
-        { "OpenStreetMap": osm, "Peta Topografi": esriTopo, "Citra Satelit": esriSatelit },
+        {
+          "OpenStreetMap (Voyager)": osmVoyager,
+          "OpenStreetMap (Klasik)": osmClassic,
+          "Citra Satelit": esriSatelit,
+        },
         {},
         { position: "topright" },
       )
