@@ -573,6 +573,62 @@ export async function getStatistikPerDesaDirect(): Promise<DesaStatistikDirect[]
         status: 'ok' as const,
       };
     } catch {
+      // Fallback 1: Cek apakah ada data di tabel lokal statistik_desa
+      try {
+        const localStat = db
+          .prepare(`
+            SELECT
+              COALESCE(SUM(s.jumlah), 0) AS penduduk,
+              COALESCE(SUM(s.laki), 0) AS laki,
+              COALESCE(SUM(s.perempuan), 0) AS perempuan
+            FROM desa d
+            JOIN statistik_desa s ON s.desa_id = d.id AND s.kategori = 'jenis_kelamin'
+            WHERE d.slug = ?
+          `)
+          .get(desa.slug) as { penduduk: number; laki: number; perempuan: number } | undefined;
+
+        if (localStat && localStat.penduduk > 0) {
+          return {
+            desa_slug: desa.slug,
+            desa_nama: desa.nama,
+            website: desa.website,
+            penduduk: localStat.penduduk,
+            laki_laki: localStat.laki,
+            perempuan: localStat.perempuan,
+            status: 'ok' as const,
+          };
+        }
+      } catch {
+        // lanjut ke fallback berikutnya
+      }
+
+      // Fallback 2: Cek apakah ada di tabel statistik_penduduk
+      try {
+        const localPenduduk = db
+          .prepare(`
+            SELECT penduduk, laki_laki, perempuan
+            FROM statistik_penduduk
+            WHERE desa_slug = ?
+            ORDER BY tahun DESC
+            LIMIT 1
+          `)
+          .get(desa.slug) as { penduduk: number; laki_laki: number; perempuan: number } | undefined;
+
+        if (localPenduduk && (localPenduduk.penduduk ?? 0) > 0) {
+          return {
+            desa_slug: desa.slug,
+            desa_nama: desa.nama,
+            website: desa.website,
+            penduduk: localPenduduk.penduduk,
+            laki_laki: localPenduduk.laki_laki ?? 0,
+            perempuan: localPenduduk.perempuan ?? 0,
+            status: 'ok' as const,
+          };
+        }
+      } catch {
+        // fallback
+      }
+
       return {
         desa_slug: desa.slug,
         desa_nama: desa.nama,
@@ -580,7 +636,7 @@ export async function getStatistikPerDesaDirect(): Promise<DesaStatistikDirect[]
         penduduk: 0,
         laki_laki: 0,
         perempuan: 0,
-        status: 'error' as const,
+        status: 'empty' as const,
       };
     }
   });

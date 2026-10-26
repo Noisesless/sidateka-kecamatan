@@ -211,10 +211,10 @@ function DesaStatCardDirect({ data }: {
         </a>
       </div>
       {isError || isEmpty ? (
-        <div className="text-center py-4">
-          <p className="text-xs text-[var(--color-muted-foreground)]">
-            {isError ? 'Gagal mengambil data' : 'Data belum tersedia'}
-          </p>
+        <div className="text-center py-5">
+          <span className="inline-block px-2.5 py-1 rounded-md bg-slate-50 border border-slate-200/80 text-[11px] text-slate-500 font-medium">
+            Menunggu integrasi data desa
+          </span>
         </div>
       ) : (
         <>
