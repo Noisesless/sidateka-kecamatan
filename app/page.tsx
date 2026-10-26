@@ -4,6 +4,7 @@ import {
   getAllDesa,
   getPopularArtikel,
   getRecentArtikel,
+  getHeroSlideArtikel,
   getRecentBerita,
   getPaginatedArtikel,
   getTotalArtikelCount,
@@ -44,6 +45,7 @@ export default async function HomePage(props: {
   const totalPages = Math.max(1, Math.ceil(Math.max(0, totalArtikel - 1) / pageSize));
 
   const topRecent = getRecentArtikel(3);
+  const heroArticles = getHeroSlideArtikel(10);
   const popular = getPopularArtikel(5);
   const desaList = getAllDesa(true);
   const beritaKecamatan = getRecentBerita(4);
@@ -74,28 +76,17 @@ export default async function HomePage(props: {
     .all() as Array<{ desa_id: number; c: number }>;
   const countMap = new Map(counts.map((r) => [r.desa_id, r.c]));
 
-  // Susun slide hero dari 3 artikel terbaru
-  const heroSlides: HeroSlide[] = [];
-  if (topRecent[0]) {
-    heroSlides.push({
-      id: topRecent[0].id,
-      title: topRecent[0].judul,
-      subtitle: topRecent[0].ringkasan ?? undefined,
-      image: topRecent[0].gambar ?? undefined,
-      href: `/artikel/${topRecent[0].desa.slug}/${topRecent[0].slug}`,
-      cta: "Baca selengkapnya",
-    });
-  }
-  for (const a of topRecent.slice(1, 3)) {
-    heroSlides.push({
-      id: a.id,
-      title: a.judul,
-      subtitle: a.ringkasan ?? undefined,
-      image: a.gambar ?? undefined,
-      href: `/artikel/${a.desa.slug}/${a.slug}`,
-      cta: "Baca selengkapnya",
-    });
-  }
+  // Susun slide hero dari hingga 10 artikel terbaru (prioritas berfoto) agar visual variatif
+  const heroSlides: HeroSlide[] = heroArticles.map((a) => ({
+    id: a.id,
+    title: a.judul,
+    subtitle: a.ringkasan ?? undefined,
+    image: a.gambar ?? undefined,
+    href: `/artikel/${a.desa.slug}/${a.slug}`,
+    cta: "Baca selengkapnya",
+    desaName: a.desa?.nama,
+  }));
+
   if (heroSlides.length === 0) {
     heroSlides.push({
       id: "default",

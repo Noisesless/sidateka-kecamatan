@@ -58,6 +58,45 @@ export function getRecentArtikel(limit = 12, desaSlug?: string): ArtikelWithDesa
   return rows.map(({ d_slug, d_nama, ...a }) => ({ ...a, desa: { slug: d_slug, nama: d_nama } }));
 }
 
+/**
+ * Mengambil hingga 10 artikel terbaru untuk hero slider dengan mengutamakan
+ * artikel yang memiliki foto/gambar agar slide lebih variatif dan menarik.
+ */
+export function getHeroSlideArtikel(limit = 10): ArtikelWithDesa[] {
+  const withImages = db
+    .prepare(
+      `SELECT a.*, d.slug AS d_slug, d.nama AS d_nama
+       FROM artikel a
+       JOIN desa d ON d.id = a.desa_id
+       WHERE a.gambar IS NOT NULL AND TRIM(a.gambar) != ''
+       ORDER BY COALESCE(a.published_at, a.fetched_at) DESC
+       LIMIT ?`,
+    )
+    .all(limit) as (Artikel & { d_slug: string; d_nama: string })[];
+
+  if (withImages.length >= limit) {
+    return withImages.map(({ d_slug, d_nama, ...a }) => ({ ...a, desa: { slug: d_slug, nama: d_nama } }));
+  }
+
+  const excludeIds = withImages.map((a) => a.id);
+  const remaining = limit - withImages.length;
+  const placeholders = excludeIds.length > 0 ? `AND a.id NOT IN (${excludeIds.map(() => '?').join(',')})` : '';
+
+  const others = db
+    .prepare(
+      `SELECT a.*, d.slug AS d_slug, d.nama AS d_nama
+       FROM artikel a
+       JOIN desa d ON d.id = a.desa_id
+       WHERE 1=1 ${placeholders}
+       ORDER BY COALESCE(a.published_at, a.fetched_at) DESC
+       LIMIT ?`,
+    )
+    .all(...excludeIds, remaining) as (Artikel & { d_slug: string; d_nama: string })[];
+
+  const combined = [...withImages, ...others];
+  return combined.map(({ d_slug, d_nama, ...a }) => ({ ...a, desa: { slug: d_slug, nama: d_nama } }));
+}
+
 export function getPaginatedArtikel(limit = 6, offset = 0, desaSlug?: string): ArtikelWithDesa[] {
   const where = desaSlug ? 'WHERE d.slug = ?' : '';
   const rows = db
