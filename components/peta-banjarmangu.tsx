@@ -107,7 +107,14 @@ export default function PetaBanjarmangu() {
             direction: "center",
             className: "desa-label",
           });
-          layer.bindPopup(`<strong>${feature.properties.Nama_Desa_}</strong><br/>Kec. Banjarmangu<br/>Kab. Banjarnegara`);
+          layer.bindPopup(`
+            <div style="font-family:var(--font-serif);font-size:15px;font-weight:700;color:#1e3a8a;margin-bottom:2px;letter-spacing:-0.01em;">
+              ${feature.properties.Nama_Desa_}
+            </div>
+            <div style="font-family:var(--font-sans);font-size:12px;color:#64748b;line-height:1.4;">
+              Kecamatan Banjarmangu<br/>Kabupaten Banjarnegara
+            </div>
+          `);
         },
       }).addTo(map);
 
@@ -121,14 +128,16 @@ export default function PetaBanjarmangu() {
       legend.onAdd = () => {
         const div = L.DomUtil.create("div", "peta-legend");
         div.innerHTML = `
-          <div style="background:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 1px 5px rgba(0,0,0,.2);font-size:12px;">
-            <div style="font-weight:700;margin-bottom:6px;">Kec. Banjarmangu</div>
-            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
-              <span style="display:inline-block;width:16px;height:12px;border:2px dashed #1e40af;background:rgba(59,130,246,.05);border-radius:2px;"></span>
+          <div style="background:rgba(255,255,255,0.96);backdrop-filter:blur(8px);padding:10px 14px;border-radius:10px;border:1px solid #bfdbfe;box-shadow:0 4px 12px rgba(0,0,0,0.08);font-family:var(--font-sans);">
+            <div style="font-family:var(--font-serif);font-size:13px;font-weight:700;color:#1e3a8a;margin-bottom:6px;letter-spacing:-0.01em;">
+              Kec. Banjarmangu
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;font-size:11px;color:#334155;font-weight:500;">
+              <span style="display:inline-block;width:16px;height:12px;border:2px dashed #1e40af;background:rgba(59,130,246,.08);border-radius:2px;"></span>
               <span>Batas Kecamatan</span>
             </div>
-            <div style="display:flex;align-items:center;gap:6px;">
-              <span style="display:inline-block;width:16px;height:12px;background:#2563eb;border:1px solid #fff;border-radius:2px;opacity:.55;"></span>
+            <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:#334155;font-weight:500;">
+              <span style="display:inline-block;width:16px;height:12px;background:#2563eb;border:1px solid #fff;border-radius:2px;opacity:.65;"></span>
               <span>Wilayah Desa</span>
             </div>
           </div>
@@ -153,20 +162,80 @@ export default function PetaBanjarmangu() {
         style={{ height: "500px" }}
       />
       <style>{`
+        /* Konsistensi Font Aplikasi pada Seluruh Elemen Leaflet */
+        .leaflet-container {
+          font-family: var(--font-sans), "Roboto", system-ui, -apple-system, sans-serif !important;
+        }
+        .leaflet-control {
+          font-family: var(--font-sans), "Roboto", system-ui, -apple-system, sans-serif !important;
+        }
+        .leaflet-control-layers {
+          font-family: var(--font-sans), "Roboto", system-ui, -apple-system, sans-serif !important;
+          font-size: 12px !important;
+          font-weight: 500 !important;
+          border-radius: 10px !important;
+          border: 1px solid #bfdbfe !important;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
+          background: rgba(255,255,255,0.96) !important;
+          backdrop-filter: blur(8px) !important;
+        }
+        .leaflet-control-layers-base label {
+          font-family: var(--font-sans), "Roboto", system-ui, -apple-system, sans-serif !important;
+          font-size: 12px !important;
+          color: #1e3a8a !important;
+          display: flex !important;
+          align-items: center !important;
+          gap: 6px !important;
+          padding: 2px 0 !important;
+          cursor: pointer !important;
+        }
+        .leaflet-control-attribution {
+          font-family: var(--font-sans), "Roboto", system-ui, -apple-system, sans-serif !important;
+          font-size: 11px !important;
+          background: rgba(255,255,255,0.85) !important;
+          backdrop-filter: blur(4px) !important;
+          color: #64748b !important;
+        }
+        .leaflet-control-attribution a {
+          color: #1e40af !important;
+          font-weight: 500 !important;
+        }
+        .leaflet-control-zoom {
+          border-radius: 8px !important;
+          overflow: hidden !important;
+          border: 1px solid #bfdbfe !important;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important;
+        }
+        .leaflet-control-zoom a {
+          font-family: var(--font-sans), "Roboto", system-ui, -apple-system, sans-serif !important;
+          font-weight: 700 !important;
+          color: #1e3a8a !important;
+          background: rgba(255,255,255,0.95) !important;
+        }
         .desa-label {
-          background: rgba(255,255,255,.85);
-          border: 1px solid #cbd5e1;
-          border-radius: 4px;
-          padding: 2px 6px;
-          font-size: 11px;
-          font-weight: 600;
-          color: #1e293b;
-          box-shadow: 0 1px 3px rgba(0,0,0,.15);
-          white-space: nowrap;
+          font-family: var(--font-sans), "Roboto", system-ui, -apple-system, sans-serif !important;
+          background: rgba(255,255,255,0.92) !important;
+          border: 1px solid #bfdbfe !important;
+          border-radius: 6px !important;
+          padding: 3px 8px !important;
+          font-size: 11px !important;
+          font-weight: 600 !important;
+          color: #1e3a8a !important;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.1) !important;
+          white-space: nowrap !important;
+          backdrop-filter: blur(4px) !important;
+        }
+        .leaflet-popup-content-wrapper {
+          border-radius: 12px !important;
+          border: 1px solid #bfdbfe !important;
+          box-shadow: 0 6px 20px rgba(0,0,0,0.12) !important;
+          font-family: var(--font-sans), "Roboto", system-ui, -apple-system, sans-serif !important;
         }
         .leaflet-popup-content {
-          font-size: 13px;
-          line-height: 1.5;
+          font-family: var(--font-sans), "Roboto", system-ui, -apple-system, sans-serif !important;
+          font-size: 12px !important;
+          line-height: 1.5 !important;
+          margin: 12px 14px !important;
         }
       `}</style>
     </>
