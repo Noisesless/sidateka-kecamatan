@@ -1,7 +1,13 @@
 import Parser from 'rss-parser';
 import * as cheerio from 'cheerio';
+import path from 'node:path';
+import fs from 'node:fs';
+import crypto from 'node:crypto';
 import { db, type Desa, type Artikel } from './db';
 import { fetchStatistikDesa } from './analitik';
+
+const UPLOAD_DIR =
+  process.env.UPLOAD_DIR || path.join(process.cwd(), '.data', 'uploads');
 
 const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
@@ -54,6 +60,92 @@ function absolutizeUrl(href: string, base: string): string {
     return new URL(href, base).toString();
   } catch {
     return href;
+  }
+}
+
+/**
+ * Unduh dan simpan gambar secara lokal ke .data/uploads/sync/<subfolder>/
+ * Mengembalikan path lokal /foto/sync/<subfolder>/<filename> jika sukses,
+ * atau fallback ke url asli jika gagal (agar proses sync tidak terhenti).
+ */
+export async function downloadAndSaveImage(
+  remoteUrl: string | null | undefined,
+  subfolder: 'artikel' | 'perangkat' | 'profil',
+  desaSlug: string
+): Promise<string | null> {
+  if (!remoteUrl) return null;
+  // Jika sudah berupa path lokal /foto/..., tidak perlu diunduh ulang
+  if (remoteUrl.startsWith('/foto/') || remoteUrl.startsWith('/')) {
+    return remoteUrl;
+  }
+  // Hanya proses URL http/https
+  if (!remoteUrl.startsWith('http://') && !remoteUrl.startsWith('https://')) {
+    return remoteUrl;
+  }
+
+  try {
+    const targetDir = path.join(UPLOAD_DIR, 'sync', subfolder);
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+    }
+
+    const hash = crypto.createHash('md5').update(remoteUrl).digest('hex').slice(0, 12);
+    let ext = '.jpg';
+    try {
+      const parsedPath = new URL(remoteUrl).pathname;
+      const parsedExt = path.extname(parsedPath).toLowerCase();
+      if (['.jpg', '.jpeg', '.png', '.webp', '.gif'].includes(parsedExt)) {
+        ext = parsedExt;
+      }
+    } catch {
+      // fallback to .jpg
+    }
+
+    const safeSlug = slugify(desaSlug) || 'desa';
+    const filename = `${safeSlug}-${hash}${ext}`;
+    const localFilePath = path.join(targetDir, filename);
+    const localServedUrl = `/foto/sync/${subfolder}/${filename}`;
+
+    // Jika file sudah tersimpan di disk, langsung gunakan URL lokal
+    if (fs.existsSync(localFilePath) && fs.statSync(localFilePath).size > 0) {
+      return localServedUrl;
+    }
+
+    // Unduh gambar dengan timeout 12 detik dan User-Agent terpercaya
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12_000);
+
+    const res = await fetch(remoteUrl, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': UAS[Math.floor(Math.random() * UAS.length)],
+        'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+      },
+    });
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      return remoteUrl;
+    }
+
+    const contentType = res.headers.get('content-type') || '';
+    // Pastikan respon benar-benar file gambar, bukan HTML challenge/error Cloudflare
+    if (contentType.includes('text/html') || contentType.includes('application/json')) {
+      return remoteUrl;
+    }
+
+    const arrayBuffer = await res.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // Filter file kosong / korup
+    if (buffer.length < 100) {
+      return remoteUrl;
+    }
+
+    fs.writeFileSync(localFilePath, buffer);
+    return localServedUrl;
+  } catch {
+    return remoteUrl;
   }
 }
 
@@ -623,48 +715,91 @@ async function fetchOpenSidApi(desa: Desa): Promise<Artikel[]> {
 
 /* ====================== UPSERT ====================== */
 
-function upsertArtikel(items: Artikel[], desaId: number): { newCount: number; updatedCount: number } {
-  const upsert = db.prepare(`
+type UpsertResult = {
+  newCount: number;
+  updatedCount: number;
+  skippedCount: number;
+  savedPhotosCount: number;
+};
+
+function upsertArtikel(items: Artikel[], desaId: number): UpsertResult {
+  const findExisting = db.prepare(
+    'SELECT id, published_at, gambar, ringkasan, konten FROM artikel WHERE desa_id = ? AND slug = ?'
+  );
+
+  const insertStmt = db.prepare(`
     INSERT INTO artikel (
       desa_id, external_id, judul, slug, url, ringkasan, konten, gambar, penulis, kategori, published_at, source
     ) VALUES (
       @desa_id, @external_id, @judul, @slug, @url, @ringkasan, @konten, @gambar, @penulis, @kategori, @published_at, @source
     )
-    ON CONFLICT(desa_id, slug) DO UPDATE SET
-      judul = excluded.judul,
-      url = excluded.url,
-      -- Jangan timpa ringkasan/konten yang lebih lengkap (mis. hasil fetch halaman
-      -- detail) dengan excerpt RSS/push yang lebih pendek.
+  `);
+
+  const updateStmt = db.prepare(`
+    UPDATE artikel SET
+      judul = @judul,
+      url = @url,
       ringkasan = CASE
-        WHEN length(COALESCE(excluded.ringkasan, '')) > length(COALESCE(artikel.ringkasan, ''))
-        THEN excluded.ringkasan
-        ELSE artikel.ringkasan
+        WHEN length(COALESCE(@ringkasan, '')) > length(COALESCE(ringkasan, ''))
+        THEN @ringkasan
+        ELSE ringkasan
       END,
       konten = CASE
-        WHEN length(COALESCE(excluded.konten, '')) > length(COALESCE(artikel.konten, ''))
-        THEN excluded.konten
-        ELSE artikel.konten
+        WHEN length(COALESCE(@konten, '')) > length(COALESCE(konten, ''))
+        THEN @konten
+        ELSE konten
       END,
-      gambar = excluded.gambar,
-      penulis = excluded.penulis,
-      kategori = excluded.kategori,
-      published_at = excluded.published_at,
-      source = excluded.source,
+      gambar = CASE
+        WHEN gambar LIKE '/foto/%' THEN gambar
+        WHEN @gambar IS NOT NULL AND @gambar != '' THEN @gambar
+        ELSE gambar
+      END,
+      penulis = COALESCE(@penulis, penulis),
+      kategori = COALESCE(@kategori, kategori),
+      published_at = COALESCE(@published_at, published_at),
+      source = @source,
       fetched_at = datetime('now')
+    WHERE desa_id = @desa_id AND slug = @slug
   `);
+
   let newCount = 0;
   let updatedCount = 0;
-  const existStmt = db.prepare('SELECT 1 FROM artikel WHERE desa_id = ? AND slug = ?');
+  let skippedCount = 0;
+  let savedPhotosCount = 0;
+
   const tx = db.transaction((rows: Artikel[]) => {
     for (const r of rows) {
-      const existed = existStmt.get(r.desa_id, r.slug);
-      upsert.run({ ...r, desa_id: desaId });
-      if (existed) updatedCount++;
-      else newCount++;
+      const existing = findExisting.get(desaId, r.slug) as
+        | { id: number; published_at: string | null; gambar: string | null; ringkasan: string | null; konten: string | null }
+        | undefined;
+
+      if (!existing) {
+        insertStmt.run({ ...r, desa_id: desaId });
+        newCount++;
+        if (r.gambar && r.gambar.startsWith('/foto/')) {
+          savedPhotosCount++;
+        }
+      } else {
+        // PERIKSA: Jika tanggal publikasi sama dan gambar lokal sudah tersimpan,
+        // JANGAN timpa data lama secara membabi-buta (skip pembaruan redundan).
+        const isSameDate = (existing.published_at ?? '') === (r.published_at ?? '');
+        const hasLocalImage = existing.gambar && existing.gambar.startsWith('/foto/');
+
+        if (isSameDate && hasLocalImage) {
+          skippedCount++;
+        } else {
+          updateStmt.run({ ...r, desa_id: desaId });
+          updatedCount++;
+        }
+        if ((r.gambar && r.gambar.startsWith('/foto/')) || hasLocalImage) {
+          savedPhotosCount++;
+        }
+      }
     }
   });
+
   tx(items);
-  return { newCount, updatedCount };
+  return { newCount, updatedCount, skippedCount, savedPhotosCount };
 }
 
 /* ====================== PROFIL & LEMBAGA DESA ====================== */
@@ -968,14 +1103,30 @@ export function detectAparatur(html: string, pageUrl: string): AparaturEntry[] {
   return out.slice(0, 40);
 }
 
-/** Ganti seluruh data perangkat desa dengan hasil deteksi terbaru. */
+/** Ganti seluruh data perangkat desa dengan hasil deteksi terbaru (pertahankan foto lokal lama jika ada). */
 function replacePerangkatDesa(desaId: number, rows: AparaturEntry[]): void {
+  // Ambil foto yang sudah tersimpan lokal sebelumnya agar tidak hilang
+  const existingRows = db
+    .prepare('SELECT nama, jabatan, foto_url FROM perangkat_desa WHERE desa_id = ?')
+    .all(desaId) as Array<{ nama: string; jabatan: string; foto_url: string | null }>;
+  const existingPhotoMap = new Map<string, string>();
+  for (const er of existingRows) {
+    if (er.foto_url && er.foto_url.startsWith('/foto/')) {
+      existingPhotoMap.set(`${er.jabatan}|${er.nama}`.toLowerCase(), er.foto_url);
+    }
+  }
+
   db.prepare('DELETE FROM perangkat_desa WHERE desa_id = ?').run(desaId);
   const ins = db.prepare(
     'INSERT INTO perangkat_desa (desa_id, nama, jabatan, foto_url, urutan) VALUES (?, ?, ?, ?, ?)',
   );
   rows.forEach((r, i) => {
-    ins.run(desaId, r.nama.slice(0, 200), r.jabatan.slice(0, 200), r.foto, i);
+    const key = `${r.jabatan}|${r.nama}`.toLowerCase();
+    const finalFoto =
+      r.foto && r.foto.startsWith('/foto/')
+        ? r.foto
+        : existingPhotoMap.get(key) || r.foto;
+    ins.run(desaId, r.nama.slice(0, 200), r.jabatan.slice(0, 200), finalFoto, i);
   });
 }
 
@@ -1051,9 +1202,15 @@ export async function fetchProfilDesa(desa: Desa): Promise<string> {
     );
   }
 
-  // 4. Simpan data perangkat hasil deteksi (grid rapi menggantikan scrape mentah)
+  // 4. Simpan data perangkat hasil deteksi dan unduh foto aparatur ke lokal
   if (perangkatMap.size > 0) {
-    replacePerangkatDesa(desa.id, [...perangkatMap.values()]);
+    const rows = [...perangkatMap.values()];
+    for (const r of rows) {
+      if (r.foto) {
+        r.foto = await downloadAndSaveImage(r.foto, 'perangkat', desa.slug);
+      }
+    }
+    replacePerangkatDesa(desa.id, rows);
   }
 
   return `profil: ${saved} tersimpan${spam ? `, ${spam} spam dilewati` : ''}${gagal ? `, ${gagal} gagal` : ''}${perangkatMap.size ? `, ${perangkatMap.size} perangkat` : ''}`;
@@ -1086,7 +1243,7 @@ export type PushIngestResult = {
   invalid: number;
 };
 
-export function ingestPushPayload(desaId: number, payload: PushPayload): PushIngestResult {
+export async function ingestPushPayload(desaId: number, payload: PushPayload): Promise<PushIngestResult> {
   if (!Array.isArray(payload?.items)) {
     return { newCount: 0, updatedCount: 0, totalReceived: 0, invalid: 0 };
   }
@@ -1118,9 +1275,15 @@ export function ingestPushPayload(desaId: number, payload: PushPayload): PushIng
       fetched_at: new Date().toISOString(),
     });
   }
-  if (items.length === 0) {
-    return { newCount: 0, updatedCount: 0, totalReceived: payload.items.length, invalid };
+  // Unduh gambar artikel jika ada
+  const desa = db.prepare('SELECT slug FROM desa WHERE id = ?').get(desaId) as { slug: string } | undefined;
+  const desaSlug = desa?.slug || 'desa';
+  for (const item of items) {
+    if (item.gambar) {
+      item.gambar = await downloadAndSaveImage(item.gambar, 'artikel', desaSlug);
+    }
   }
+
   const { newCount, updatedCount } = upsertArtikel(items, desaId);
   return { newCount, updatedCount, totalReceived: payload.items.length, invalid };
 }
@@ -1202,19 +1365,62 @@ export async function syncDesa(desa: Desa): Promise<SyncResult> {
   }
 
   // Batasi ke N artikel terbaru per desa — berlaku untuk semua sumber
-  // (RSS sudah dipotong saat streaming; API/scrape dipotong di sini).
-  // Item tanpa tanggal ditaruh di urutan akhir.
   items = items
     .slice()
     .sort((a, b) => (b.published_at ?? '').localeCompare(a.published_at ?? ''))
     .slice(0, MAX_ARTIKEL_PER_DESA);
 
-  const { newCount, updatedCount } = upsertArtikel(items, desa.id);
+  // Unduh dan simpan gambar artikel secara lokal ke .data/uploads/sync/artikel/
+  // agar foto tidak hilang saat proteksi WAF desa aktif kembali
+  let photoSaved = 0;
+  for (const item of items) {
+    if (item.gambar) {
+      const local = await downloadAndSaveImage(item.gambar, 'artikel', desa.slug);
+      if (local && local.startsWith('/foto/')) photoSaved++;
+      item.gambar = local;
+    }
+  }
+
+  const { newCount, updatedCount, skippedCount, savedPhotosCount } = upsertArtikel(items, desa.id);
+
+  // Backfill gambar artikel lama yang masih pakai URL remote (jika ada)
+  try {
+    const oldArticles = db
+      .prepare("SELECT id, gambar FROM artikel WHERE desa_id = ? AND gambar LIKE 'http%'")
+      .all(desa.id) as Array<{ id: number; gambar: string }>;
+    for (const oa of oldArticles) {
+      const local = await downloadAndSaveImage(oa.gambar, 'artikel', desa.slug);
+      if (local && local.startsWith('/foto/')) {
+        db.prepare("UPDATE artikel SET gambar = ? WHERE id = ?").run(local, oa.id);
+      }
+    }
+  } catch {
+    // silent fallback
+  }
+
   const source: SyncResult['source'] =
     usedSources.length > 1 ? 'mixed' : usedSources[0] ?? 'rss';
+
+  // Susun pesan status yang sangat jelas dan informatif
+  const summaryParts: string[] = [];
+  if (newCount > 0) summaryParts.push(`+${newCount} baru`);
+  if (updatedCount > 0) summaryParts.push(`${updatedCount} diperbarui`);
+  if (skippedCount > 0) summaryParts.push(`${skippedCount} tidak berubah`);
+  if (savedPhotosCount > 0 || photoSaved > 0) {
+    summaryParts.push(`${Math.max(savedPhotosCount, photoSaved)} foto tersimpan lokal`);
+  }
+
+  const artikelMsg = summaryParts.length > 0 ? summaryParts.join(', ') : 'artikel sinkron';
+
   return {
     status: 'ok',
-    message: [errors.length ? `partial (${errors.join('; ')})` : 'ok', profilMsg, statistikMsg].filter(Boolean).join(' | '),
+    message: [
+      errors.length ? `sebagian (${errors.join('; ')})` : `ok (${artikelMsg})`,
+      profilMsg,
+      statistikMsg,
+    ]
+      .filter(Boolean)
+      .join(' | '),
     newCount,
     updatedCount,
     durationMs: Date.now() - start,

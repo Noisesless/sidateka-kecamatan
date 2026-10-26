@@ -1,4 +1,5 @@
 import type { PerangkatDesa } from '@/lib/db';
+import { SafeImage } from '@/components/safe-image';
 
 function UserIcon({ className }: { className?: string }) {
   return (

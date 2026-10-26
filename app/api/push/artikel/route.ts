@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
   // Proses upsert
   let result;
   try {
-    result = ingestPushPayload(desa.id, payload);
+    result = await ingestPushPayload(desa.id, payload);
   } catch (e) {
     const msg = (e as Error).message;
     logInbox(desa.id, "/api/push/artikel", payloadHash, payload.items.length, 0, 0, "failed", msg, ip);

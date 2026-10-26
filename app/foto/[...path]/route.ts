@@ -4,7 +4,8 @@ import fs from "node:fs";
 
 export const dynamic = "force-dynamic";
 
-const UPLOAD_DIR = path.join(process.cwd(), ".data", "uploads");
+const UPLOAD_DIR =
+  process.env.UPLOAD_DIR || path.join(process.cwd(), ".data", "uploads");
 
 const MIME_BY_EXT: Record<string, string> = {
   ".jpg": "image/jpeg",
@@ -29,7 +30,7 @@ export async function GET(
     return new NextResponse("Not found", { status: 404 });
   }
 
-  const filePath = path.join(UPLOAD_DIR, ...segments);
+  const filePath = path.join(/*turbopackIgnore: true*/ UPLOAD_DIR, ...segments);
   if (!filePath.startsWith(UPLOAD_DIR) || !fs.existsSync(filePath)) {
     return new NextResponse("Not found", { status: 404 });
   }
