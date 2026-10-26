@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SafeImage } from "@/components/safe-image";
 import type { ArtikelWithDesa } from "@/lib/queries";
 
 function formatDate(s: string | null): string {
@@ -39,22 +40,11 @@ export function ArticleRowCard({ artikel }: { artikel: ArtikelWithDesa }) {
           href={href}
           className="sm:col-span-4 block relative aspect-[16/10] sm:aspect-auto sm:min-h-[180px] overflow-hidden bg-[var(--color-muted)]"
         >
-          {artikel.gambar ? (
-            <img
-              src={artikel.gambar}
-              alt={artikel.judul}
-              loading="lazy"
-              className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-            />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-secondary)] text-white/40">
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <circle cx="9" cy="9" r="2" />
-                <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
-              </svg>
-            </div>
-          )}
+          <SafeImage
+            src={artikel.gambar}
+            alt={artikel.judul}
+            className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          />
         </Link>
 
         {/* content col-sm-8 */}

@@ -5,6 +5,8 @@ import {
   getPopularArtikel,
   getRecentArtikel,
   getRecentBerita,
+  getPaginatedArtikel,
+  getTotalArtikelCount,
 } from "@/lib/queries";
 import { ArticleCard } from "@/components/article-card";
 import { BeritaCard } from "@/components/berita-card";
@@ -31,15 +33,38 @@ function formatTanggal(s: string | null): string {
   });
 }
 
-export default function HomePage() {
-  const recent = getRecentArtikel(13);
+export default async function HomePage(props: {
+  searchParams?: Promise<{ page?: string }>;
+}) {
+  const searchParams = props.searchParams ? await props.searchParams : {};
+  const currentPage = Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1);
+  const pageSize = 6;
+
+  const totalArtikel = getTotalArtikelCount();
+  const totalPages = Math.max(1, Math.ceil(Math.max(0, totalArtikel - 1) / pageSize));
+
+  const topRecent = getRecentArtikel(3);
   const popular = getPopularArtikel(5);
   const desaList = getAllDesa(true);
   const beritaKecamatan = getRecentBerita(4);
 
-  const featured = recent[0];
-  const subFeatured = recent.slice(1, 3);
-  const listArtikel = recent.slice(3, 9);
+  // Pada halaman 1, tampilkan featured artikel besar dan 6 artikel berikutnya.
+  // Pada halaman 2 ke atas, tampilkan 6 artikel sesuai offset.
+  const featured = currentPage === 1 ? topRecent[0] : null;
+  const offset = currentPage === 1 ? 1 : 1 + (currentPage - 1) * pageSize;
+  const listArtikel = getPaginatedArtikel(pageSize, offset);
+
+  // Nomor halaman yang ditampilkan (maksimal 5 tombol)
+  const pagesToShow: number[] = [];
+  const maxButtons = 5;
+  let startPage = Math.max(1, currentPage - 2);
+  let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+  if (endPage - startPage < maxButtons - 1) {
+    startPage = Math.max(1, endPage - maxButtons + 1);
+  }
+  for (let p = startPage; p <= endPage; p++) {
+    pagesToShow.push(p);
+  }
 
   // hitung artikel per desa untuk badge di kartu desa
   const counts = db
@@ -49,19 +74,19 @@ export default function HomePage() {
     .all() as Array<{ desa_id: number; c: number }>;
   const countMap = new Map(counts.map((r) => [r.desa_id, r.c]));
 
-  // Susun slide hero dari featured + 2 subFeatured
+  // Susun slide hero dari 3 artikel terbaru
   const heroSlides: HeroSlide[] = [];
-  if (featured) {
+  if (topRecent[0]) {
     heroSlides.push({
-      id: featured.id,
-      title: featured.judul,
-      subtitle: featured.ringkasan ?? undefined,
-      image: featured.gambar ?? undefined,
-      href: `/artikel/${featured.desa.slug}/${featured.slug}`,
+      id: topRecent[0].id,
+      title: topRecent[0].judul,
+      subtitle: topRecent[0].ringkasan ?? undefined,
+      image: topRecent[0].gambar ?? undefined,
+      href: `/artikel/${topRecent[0].desa.slug}/${topRecent[0].slug}`,
       cta: "Baca selengkapnya",
     });
   }
-  for (const a of subFeatured) {
+  for (const a of topRecent.slice(1, 3)) {
     heroSlides.push({
       id: a.id,
       title: a.judul,
@@ -141,33 +166,78 @@ export default function HomePage() {
               </div>
             )}
 
-            {/* Pagination dummy ala OpenDK */}
-            {listArtikel.length > 0 && (
+            {/* Pagination dinamis ala OpenDK */}
+            {totalPages > 1 && (
               <nav
-                className="flex items-center justify-center gap-1 pt-2"
-                aria-label="Pagination"
+                className="flex items-center justify-center gap-1.5 pt-4"
+                aria-label="Navigasi Halaman"
               >
-                {["«", "‹", "1", "2", "›", "»"].map((label, i) => {
-                  const isActive = label === "1";
+                {/* Halaman Pertama */}
+                {currentPage > 1 && (
+                  <Link
+                    href="/?page=1#kecamatan"
+                    className="min-w-9 h-9 grid place-items-center px-2 rounded-md border text-xs font-semibold transition-colors bg-white text-[var(--color-foreground)] border-[var(--color-border)] hover:bg-[var(--color-muted)]"
+                    title="Halaman Pertama"
+                  >
+                    «
+                  </Link>
+                )}
+
+                {/* Halaman Sebelumnya */}
+                {currentPage > 1 && (
+                  <Link
+                    href={`/?page=${currentPage - 1}#kecamatan`}
+                    className="min-w-9 h-9 grid place-items-center px-2 rounded-md border text-xs font-semibold transition-colors bg-white text-[var(--color-foreground)] border-[var(--color-border)] hover:bg-[var(--color-muted)]"
+                    title="Halaman Sebelumnya"
+                  >
+                    ‹
+                  </Link>
+                )}
+
+                {/* Tombol Angka */}
+                {pagesToShow.map((p) => {
+                  const isActive = p === currentPage;
                   return (
                     <Link
-                      key={i}
-                      href="#kecamatan"
-                      className={`min-w-9 h-9 grid place-items-center px-2.5 rounded-md border text-sm font-semibold transition-colors ${
+                      key={p}
+                      href={`/?page=${p}#kecamatan`}
+                      className={`min-w-9 h-9 grid place-items-center px-3 rounded-md border text-sm font-semibold transition-colors ${
                         isActive
-                          ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)]"
+                          ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)] shadow-sm"
                           : "bg-white text-[var(--color-foreground)] border-[var(--color-border)] hover:bg-[var(--color-muted)]"
                       }`}
                     >
-                      {label}
+                      {p}
                     </Link>
                   );
                 })}
+
+                {/* Halaman Berikutnya */}
+                {currentPage < totalPages && (
+                  <Link
+                    href={`/?page=${currentPage + 1}#kecamatan`}
+                    className="min-w-9 h-9 grid place-items-center px-2 rounded-md border text-xs font-semibold transition-colors bg-white text-[var(--color-foreground)] border-[var(--color-border)] hover:bg-[var(--color-muted)]"
+                    title="Halaman Selanjutnya"
+                  >
+                    ›
+                  </Link>
+                )}
+
+                {/* Halaman Terakhir */}
+                {currentPage < totalPages && (
+                  <Link
+                    href={`/?page=${totalPages}#kecamatan`}
+                    className="min-w-9 h-9 grid place-items-center px-2 rounded-md border text-xs font-semibold transition-colors bg-white text-[var(--color-foreground)] border-[var(--color-border)] hover:bg-[var(--color-muted)]"
+                    title="Halaman Terakhir"
+                  >
+                    »
+                  </Link>
+                )}
               </nav>
             )}
 
             {/* Empty state */}
-            {recent.length === 0 && (
+            {totalArtikel === 0 && (
               <div className="rounded-2xl border-2 border-dashed border-[var(--color-border)] bg-white p-12 text-center">
                 <svg
                   className="mx-auto mb-4 text-[var(--color-muted-foreground)]"

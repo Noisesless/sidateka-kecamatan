@@ -58,6 +58,34 @@ export function getRecentArtikel(limit = 12, desaSlug?: string): ArtikelWithDesa
   return rows.map(({ d_slug, d_nama, ...a }) => ({ ...a, desa: { slug: d_slug, nama: d_nama } }));
 }
 
+export function getPaginatedArtikel(limit = 6, offset = 0, desaSlug?: string): ArtikelWithDesa[] {
+  const where = desaSlug ? 'WHERE d.slug = ?' : '';
+  const rows = db
+    .prepare(
+      `SELECT a.*, d.slug AS d_slug, d.nama AS d_nama
+       FROM artikel a
+       JOIN desa d ON d.id = a.desa_id
+       ${where}
+       ORDER BY COALESCE(a.published_at, a.fetched_at) DESC
+       LIMIT ? OFFSET ?`,
+    )
+    .all(...(desaSlug ? [desaSlug, limit, offset] : [limit, offset])) as (Artikel & { d_slug: string; d_nama: string })[];
+  return rows.map(({ d_slug, d_nama, ...a }) => ({ ...a, desa: { slug: d_slug, nama: d_nama } }));
+}
+
+export function getTotalArtikelCount(desaSlug?: string): number {
+  const where = desaSlug ? 'WHERE d.slug = ?' : '';
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) AS c
+       FROM artikel a
+       JOIN desa d ON d.id = a.desa_id
+       ${where}`,
+    )
+    .get(...(desaSlug ? [desaSlug] : [])) as { c: number } | undefined;
+  return row?.c ?? 0;
+}
+
 export function getPopularArtikel(limit = 8): ArtikelWithDesa[] {
   const rows = db
     .prepare(

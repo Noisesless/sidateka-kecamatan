@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SafeImage } from "@/components/safe-image";
 import type { ArtikelWithDesa } from "@/lib/queries";
 
 type Variant = "default" | "featured" | "compact";
@@ -43,22 +44,11 @@ export function ArticleCard({
         className="group block relative overflow-hidden rounded-2xl border border-[var(--color-border)] bg-white shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300"
       >
         <div className="relative aspect-[16/9] w-full bg-[var(--color-muted)] overflow-hidden">
-          {artikel.gambar ? (
-            <img
-              src={artikel.gambar}
-              alt={artikel.judul}
-              loading="lazy"
-              className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
-            />
-          ) : (
-            <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-secondary)] text-white/30">
-              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <circle cx="9" cy="9" r="2" />
-                <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
-              </svg>
-            </div>
-          )}
+          <SafeImage
+            src={artikel.gambar}
+            alt={artikel.judul}
+            className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
+          />
           <div className="absolute top-3 left-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[var(--color-accent)] text-white shadow-md">
             <span className="inline-block h-1.5 w-1.5 rounded-full bg-white" />
             Pilihan
@@ -99,11 +89,10 @@ export function ArticleCard({
         className="group flex gap-3 py-3 border-b border-dashed border-[var(--color-border)] last:border-b-0 hover:bg-[var(--color-muted)]/50 -mx-2 px-2 rounded-md transition-colors"
       >
         {artikel.gambar && (
-          <div className="flex-shrink-0 w-16 h-16 rounded-md overflow-hidden bg-[var(--color-muted)]">
-            <img
+          <div className="flex-shrink-0 relative w-16 h-16 rounded-md overflow-hidden bg-[var(--color-muted)]">
+            <SafeImage
               src={artikel.gambar}
               alt=""
-              loading="lazy"
               className="h-full w-full object-cover"
             />
           </div>
@@ -126,21 +115,11 @@ export function ArticleCard({
       className="group flex flex-col h-full overflow-hidden rounded-xl border border-[var(--color-border)] bg-white shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
     >
       <div className="relative aspect-[16/10] w-full bg-[var(--color-muted)] overflow-hidden">
-        {artikel.gambar ? (
-          <img
-            src={artikel.gambar}
-            alt={artikel.judul}
-            loading="lazy"
-            className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
-          />
-        ) : (
-          <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-[var(--color-secondary)] to-[var(--color-primary)] text-white/40">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-            </svg>
-          </div>
-        )}
+        <SafeImage
+          src={artikel.gambar}
+          alt={artikel.judul}
+          className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
+        />
         {artikel.kategori && (
           <div className="absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-white/90 text-[var(--color-primary)]">
             {artikel.kategori}
