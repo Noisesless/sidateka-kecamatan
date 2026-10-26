@@ -91,3 +91,13 @@ prendengan-full.html
 *.html
 !app/**/*.html
 !components/**/*.html
+
+# Internal AI Workflow (Vibes Coding)
+handover.md
+prd.md
+todo.md
+issues.md
+app-context.md
+.codebase-memory/
+.scratchpad/
+.docs/issues.md

@@ -3,14 +3,14 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import fs from 'node:fs';
 
-const DB_DIR = path.join(process.cwd(), '.data');
+const DB_PATH = process.env.DATABASE_PATH
+  ? process.env.DATABASE_PATH
+  : path.join(process.cwd(), '.data', 'portal.db');
+
+const DB_DIR = path.dirname(DB_PATH);
 if (!fs.existsSync(DB_DIR)) {
   fs.mkdirSync(DB_DIR, { recursive: true });
 }
-
-const DB_PATH = process.env.DATABASE_PATH
-  ? process.env.DATABASE_PATH
-  : path.join(DB_DIR, 'portal.db');
 
 function openDatabase(): Database.Database {
   const db = new Database(DB_PATH);
