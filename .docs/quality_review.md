@@ -6,8 +6,8 @@
 
 ## 1. Ringkasan Eksekutif
 - **Framework & Language:** Next.js 16 (App Router) + TypeScript + Tailwind CSS v4
-- **Kompleksitas Kode:** Sedang-Tinggi (45 Halaman Publik & Admin, 8 API Endpoints, Scraping Engine)
-- **Status Arsitektur:** Sangat Terstruktur — modular antara Presentation Layer, Server Actions, dan Database Layer.
+- **Kompleksitas Kode:** Sedang-Tinggi (45 Halaman Publik & Admin, 9 API Endpoints, Smart Sync Engine, Media Fallback Pipeline)
+- **Status Arsitektur:** Sangat Terstruktur — modular antara Presentation Layer, Server Actions, Database Layer, dan Universal Media Fallbacks.
 
 ---
 

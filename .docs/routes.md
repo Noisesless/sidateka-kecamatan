@@ -65,6 +65,7 @@
 | `GET` | `/api/statistik/sync` | `app/api/statistik/sync/route.ts` | Admin / Cron Key | STABLE |
 | `GET, POST` | `/api/sync` | `app/api/sync/route.ts` | Admin / Cron Key | STABLE |
 | `GET, POST` | `/api/sync/one` | `app/api/sync/one/route.ts` | Admin Session | STABLE |
+| `GET, POST` | `/api/sync/probe` | `app/api/sync/probe/route.ts` | Admin Session | STABLE |
 | `GET, POST` | `/api/sync/run` | `app/api/sync/run/route.ts` | Admin Session | STABLE |
 | `GET` | `/api/sync/test` | `app/api/sync/test/route.ts` | Public Debug | STABLE |
 | `GET, POST` | `/api/visitor` | `app/api/visitor/route.ts` | Public | STABLE |

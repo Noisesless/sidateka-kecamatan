@@ -17,15 +17,17 @@ graph TD
   end
 
   subgraph Logic [Business Logic & Service Layer]
-    SyncEngine[Agregator & Scraper (Cheerio + RSS Parser)]
+    SyncEngine[Smart Sync Engine (Pre-flight Probe + Fail-Fast)]
     AuthService[Auth Guard & Session Manager (lib/auth.ts)]
     PushService[Push API Controller (lib/sync.ts)]
     AduanEngine[Ticket Generator & Workflow Engine]
+    MediaPipeline[Universal Fallback Media Pipeline]
   end
 
   subgraph Data [Data Access & Persistence Layer]
     Queries[Data Queries (lib/queries.ts)]
     SQLiteDB[(SQLite 3 - WAL Mode)]
+    UploadsDir[Local File Storage (.data/uploads/)]
   end
 
   subgraph External [External Services & Sources]
@@ -46,6 +48,8 @@ graph TD
   PushService --> DesaPush
   PushService --> Queries
   SyncEngine --> Queries
+  SyncEngine --> UploadsDir
+  MediaPipeline --> UploadsDir
   AduanEngine --> Queries
 
   Queries --> SQLiteDB
@@ -58,14 +62,17 @@ graph TD
 ### A. Presentation Layer (`app/*`, `components/*`)
 - **Server Components (RSC):** Merender halaman secara instan di server dengan direct DB query untuk kecepatan LCP optimal.
 - **Client Components (`"use client"`):** Terisolasi untuk komponen interaktif seperti slider, peta Leaflet (`peta-banjarmangu.tsx`), filter tabs, form pengaduan, dan modal.
-- **Styling Architecture:** Tailwind CSS v4 dengan CSS variable tokens inline di `app/globals.css`.
+- **Universal SafeImage (`components/safe-image.tsx`):** Komponen gambar terlindungi yang otomatis menangkap event `onError` dan mengganti sumber gambar yang rusak ke gambar kolase kegiatan desa (`/placeholder-artikel.jpg`).
 
-### B. Business Logic Layer (`lib/*`, `app/api/*`)
-- **Web Scraping & Aggregator (`lib/sync.ts`):** Mengambil RSS feed dari 17 desa (`/feed`), mem-parse item berita, mendownload profil desa, dan mengurai struktur HTML via `cheerio`.
+### B. Business Logic & Sync Layer (`lib/*`, `app/api/*`)
+- **Smart 2-Phase Sync Engine (`lib/sync.ts` & `/api/sync/probe`):**
+  1. *Phase 1 (Pre-flight Probe):* Memeriksa konektivitas 17 desa secara paralel (3 detik) untuk memetakan status `online` vs `blocked_waf` Cloudflare.
+  2. *Phase 2 (Selective Sync):* Menyinkronkan hanya desa-desa yang terbukti online, memangkas waktu proses dari 6 menit menjadi 10–15 detik.
+  3. *Fail-Fast WAF Guard:* Jika mendeteksi Cloudflare 403 (*Just a moment...*), sistem menghentikan retry seketika (<1 detik) tanpa membuang waktu 25 detik per desa.
 - **Push Controller (`app/api/push/*`):** Menangani kiriman REST API langsung dari instalasi OpenSID desa menggunakan validasi `X-API-Key`.
 - **Authentication & Security (`lib/auth.ts`):** SHA-256 hash validation, single-token session cookies (`admin_session`), dan role checking.
 
-### C. Data Access Layer (`lib/db.ts`, `lib/queries.ts`)
+### C. Data Access Layer (`lib/db.ts`, `lib/queries.ts`, `lib/statistik.ts`)
 - **Singleton Connection (`globalThis.__db`):** Menghindari exhaustion file locks pada parallel build Next.js.
 - **ACID & Concurrency:** Write-Ahead Logging (WAL mode) dengan `busy_timeout = 30000` mencegah error `database is locked`.
-- **Prepared Queries:** Seluruh operasi data menggunakan parameter binding native `better-sqlite3`.
+- **Hybrid Statistik Fallback:** Halaman statistik memprioritaskan live fetch OpenSID, namun jika gagal/terblokir WAF otomatis beralih ke cache data tabel SQLite lokal `statistik_desa` & `statistik_penduduk`.

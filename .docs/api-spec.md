@@ -43,6 +43,13 @@
 
 ---
 
+### `GET /foto/[...path]`
+- **Deskripsi:** Menyajikan file gambar artikel dan profil dari disk lokal `.data/uploads/`.
+- **Autentikasi:** None (Public)
+- **Perlindungan Anti-Broken:** Jika file gambar tidak ditemukan di disk lokal, endpoint secara dinamis menyajikan file kolase kegiatan warga desa (`/placeholder-artikel.jpg` atau SVG fallback) dengan HTTP 200, sehingga browser tidak pernah menampilkan ikon gambar rusak.
+
+---
+
 ## 2. Push Integration Endpoints (OpenSID Desa)
 
 ### `POST /api/push/artikel`
@@ -80,14 +87,71 @@
 
 ---
 
-## 3. Administrative & Scraping Triggers
+## 3. Administrative & Sync Endpoints
+
+### `GET, POST /api/sync/probe`
+- **Deskripsi:** Memeriksa konektivitas seluruh 17 desa secara **paralel (simultan)** dalam 3–4 detik sebelum proses sinkronisasi dimulai.
+- **Autentikasi:** Admin Session Cookie
+- **Response Success (200 OK):**
+  ```json
+  {
+    "ok": true,
+    "total": 17,
+    "onlineCount": 4,
+    "blockedCount": 13,
+    "offlineCount": 0,
+    "results": [
+      {
+        "id": 12,
+        "nama": "Prendengan",
+        "slug": "prendengan",
+        "website": "https://prendengan-banjarmangu.sistemdata.id",
+        "status": "online",
+        "message": "Online & Siap Sync",
+        "latencyMs": 380
+      },
+      {
+        "id": 2,
+        "nama": "Banjarmangu",
+        "slug": "banjarmangu",
+        "website": "https://banjarmangu-banjarnegara.desa.id",
+        "status": "blocked_waf",
+        "message": "Cloudflare WAF Challenge (403)",
+        "latencyMs": 240
+      }
+    ]
+  }
+  ```
+
+---
+
+### `POST /api/sync/run`
+- **Deskripsi:** Menjalankan sinkronisasi penuh untuk satu desa tertentu (Artikel, Foto Lokal, Profil, dan Statistik).
+- **Autentikasi:** Admin Session Cookie
+- **Request Body:**
+  ```json
+  {
+    "slug": "prendengan"
+  }
+  ```
+- **Response Success (200 OK):**
+  ```json
+  {
+    "ok": true,
+    "result": {
+      "status": "ok",
+      "message": "ok (+2 baru, 8 foto tersimpan lokal) | profil: 7 tersimpan",
+      "newCount": 2,
+      "updatedCount": 0,
+      "durationMs": 4200,
+      "source": "rss"
+    }
+  }
+  ```
+
+---
 
 ### `GET, POST /api/sync`
-- **Deskripsi:** Memicu proses background agregasi/sync untuk seluruh 17 desa.
+- **Deskripsi:** Memicu proses cron background agregasi/sync untuk seluruh desa aktif.
 - **Autentikasi:** Header `Authorization: Bearer <CRON_SECRET>` atau Admin Session
 - **Query Params:** `?limit=17`
-
-### `GET, POST /api/sync/one`
-- **Deskripsi:** Memicu sinkronisasi khusus untuk satu desa tertentu berdasarkan slug/id.
-- **Autentikasi:** Admin Session Cookie
-- **Query Params:** `?slug=prendengan`
