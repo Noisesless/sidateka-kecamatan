@@ -1,13 +1,13 @@
 module.exports = {
   apps: [
     {
-      name: 'portal-kecamatan',
+      name: 'sidateka',
       script: 'npm',
       args: 'start',
       cwd: __dirname,
       env: {
         NODE_ENV: 'production',
-        PORT: 3038,
+        PORT: 3010,
       },
       instances: 1,
       autorestart: true,

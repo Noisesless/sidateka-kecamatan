@@ -41,15 +41,17 @@ PM2_BIN="$HOME/.npm-global/bin/pm2"
 [ -x "$PM2_BIN" ] || PM2_BIN="$HOME/node_modules/.bin/pm2"
 
 echo "==> [6/6] Start/Restart dengan PM2"
-if "$PM2_BIN" list | grep -q "portal-kecamatan"; then
+if "$PM2_BIN" list | grep -q "sidateka"; then
+  "$PM2_BIN" restart sidateka
+elif "$PM2_BIN" list | grep -q "portal-kecamatan"; then
   "$PM2_BIN" restart portal-kecamatan
 else
   cd "$APP_DIR"
-  PORT="${PORT:-3033}" "$PM2_BIN" start npm --name portal-kecamatan -- start
+  PORT="${PORT:-3010}" "$PM2_BIN" start npm --name sidateka -- start -- -p "${PORT:-3010}"
 fi
 "$PM2_BIN" save || true
 
 echo ""
 echo "==> Selesai."
 echo "   Status: $PM2_BIN status"
-echo "   Log   : $PM2_BIN logs portal-kecamatan --lines 100"
+echo "   Log   : $PM2_BIN logs sidateka --lines 50"
