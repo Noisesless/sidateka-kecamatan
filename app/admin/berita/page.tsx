@@ -189,10 +189,12 @@ export default async function AdminBeritaPage({
             </div>
             {editItem?.gambar_utama && (
               <div className="flex items-start gap-3">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={editItem.gambar_utama}
                   alt="Foto unggulan"
+                  onError={(e) => {
+                    e.currentTarget.src = "/placeholder-artikel.jpg";
+                  }}
                   className="w-32 h-20 object-cover rounded-lg border border-[var(--color-border)]"
                 />
                 <label className="flex items-center gap-2 cursor-pointer text-xs">
@@ -324,10 +326,12 @@ export default async function AdminBeritaPage({
             {all.map((b) => (
               <div key={b.id} className="px-5 sm:px-6 py-4 flex flex-wrap items-center gap-4">
                 {b.gambar_utama ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
                   <img
                     src={b.gambar_utama}
                     alt=""
+                    onError={(e) => {
+                      e.currentTarget.src = "/placeholder-artikel.jpg";
+                    }}
                     className="w-20 h-14 object-cover rounded-lg border border-[var(--color-border)] shrink-0"
                   />
                 ) : (

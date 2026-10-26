@@ -7,6 +7,7 @@ import {
   incrementBeritaView,
 } from "@/lib/queries";
 import { BeritaCard } from "@/components/berita-card";
+import { SafeImage } from "@/components/safe-image";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -120,8 +121,7 @@ export default async function BeritaDetailPage({
       {b.gambar_utama && (
         <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 -mt-8 sm:-mt-12 relative z-10">
           <div className="rounded-2xl overflow-hidden border-4 border-white shadow-2xl bg-[var(--color-muted)]">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <SafeImage
               src={b.gambar_utama}
               alt={b.judul}
               className="w-full h-auto max-h-[480px] object-cover"

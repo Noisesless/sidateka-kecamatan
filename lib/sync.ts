@@ -124,14 +124,16 @@ export async function downloadAndSaveImage(
     });
     clearTimeout(timeoutId);
 
+    const FALLBACK_COLLAGE = '/placeholder-artikel.jpg';
+
     if (!res.ok) {
-      return remoteUrl;
+      return FALLBACK_COLLAGE;
     }
 
     const contentType = res.headers.get('content-type') || '';
     // Pastikan respon benar-benar file gambar, bukan HTML challenge/error Cloudflare
     if (contentType.includes('text/html') || contentType.includes('application/json')) {
-      return remoteUrl;
+      return FALLBACK_COLLAGE;
     }
 
     const arrayBuffer = await res.arrayBuffer();
@@ -139,13 +141,13 @@ export async function downloadAndSaveImage(
 
     // Filter file kosong / korup
     if (buffer.length < 100) {
-      return remoteUrl;
+      return FALLBACK_COLLAGE;
     }
 
     fs.writeFileSync(localFilePath, buffer);
     return localServedUrl;
   } catch {
-    return remoteUrl;
+    return '/placeholder-artikel.jpg';
   }
 }
 

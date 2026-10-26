@@ -4,58 +4,39 @@ import { useState } from "react";
 
 interface SafeImageProps {
   src: string | null | undefined;
-  alt: string;
+  alt?: string;
   className?: string;
   fillContainer?: boolean;
 }
 
+const FALLBACK_SRC = "/placeholder-artikel.jpg";
+
 export function SafeImage({
   src,
-  alt,
+  alt = "Foto Kegiatan Desa",
   className = "w-full h-full object-cover",
-  fillContainer = true,
 }: SafeImageProps) {
+  const [imgSrc, setImgSrc] = useState<string>(src || FALLBACK_SRC);
   const [hasError, setHasError] = useState(false);
 
-  if (!src || hasError) {
-    return (
-      <div
-        className={`${
-          fillContainer ? "absolute inset-0" : "w-full h-full min-h-[140px]"
-        } flex flex-col items-center justify-center bg-gradient-to-br from-slate-100 via-slate-150 to-slate-200 text-slate-400 p-4 select-none`}
-        aria-label={alt}
-      >
-        <svg
-          className="w-10 h-10 opacity-50 mb-1"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2Z" />
-          <path d="M18 10h-6" />
-          <path d="M18 14h-6" />
-          <path d="M18 18h-6" />
-          <path d="M6 10h2v2H6z" />
-          <path d="M6 14h2v2H6z" />
-        </svg>
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-center line-clamp-1 max-w-[90%]">
-          Berita Desa
-        </span>
-      </div>
-    );
-  }
+  const handleError = () => {
+    if (!hasError && imgSrc !== FALLBACK_SRC) {
+      setHasError(true);
+      setImgSrc(FALLBACK_SRC);
+    }
+  };
 
   return (
+    // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={src}
+      src={imgSrc}
       alt={alt}
       loading="lazy"
       referrerPolicy="no-referrer"
-      onError={() => setHasError(true)}
+      onError={handleError}
       className={className}
     />
   );
 }
+
+export default SafeImage;

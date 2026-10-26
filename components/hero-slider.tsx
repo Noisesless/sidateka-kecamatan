@@ -48,6 +48,9 @@ export function HeroSlider({ slides }: { slides: HeroSlide[] }) {
             <img
               src={s.image}
               alt={s.title}
+              onError={(e) => {
+                e.currentTarget.src = "/placeholder-artikel.jpg";
+              }}
               className="absolute inset-0 w-full h-full object-cover"
             />
           ) : (

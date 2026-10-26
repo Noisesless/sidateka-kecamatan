@@ -4,6 +4,7 @@ import * as cheerio from "cheerio";
 import { db } from "@/lib/db";
 import { getArtikelByDesaAndSlug, getRecentArtikel } from "@/lib/queries";
 import { ArticleCard } from "@/components/article-card";
+import { SafeImage } from "@/components/safe-image";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -259,7 +260,7 @@ export default async function ArtikelDetailPage({
       {a.gambar && (
         <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 -mt-8 sm:-mt-12 relative z-10">
           <div className="rounded-2xl overflow-hidden border-4 border-white shadow-2xl bg-[var(--color-muted)]">
-            <img
+            <SafeImage
               src={a.gambar}
               alt={a.judul}
               className="w-full h-auto max-h-[480px] object-cover"

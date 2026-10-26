@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ArtikelKecamatan } from "@/lib/db";
+import { SafeImage } from "@/components/safe-image";
 
 type Variant = "default" | "compact";
 
@@ -42,12 +43,10 @@ export function BeritaCard({
         className="group flex gap-3 py-3 border-b border-dashed border-[var(--color-border)] last:border-b-0 hover:bg-[var(--color-muted)]/50 -mx-2 px-2 rounded-md transition-colors"
       >
         {berita.gambar_utama && (
-          <div className="flex-shrink-0 w-16 h-16 rounded-md overflow-hidden bg-[var(--color-muted)]">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+          <div className="flex-shrink-0 w-16 h-16 rounded-md overflow-hidden bg-[var(--color-muted)] relative">
+            <SafeImage
               src={berita.gambar_utama}
               alt=""
-              loading="lazy"
               className="h-full w-full object-cover"
             />
           </div>
@@ -70,24 +69,11 @@ export function BeritaCard({
       className="group flex flex-col h-full overflow-hidden rounded-xl border border-[var(--color-border)] bg-white shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
     >
       <div className="relative aspect-[16/10] w-full bg-[var(--color-muted)] overflow-hidden">
-        {berita.gambar_utama ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={berita.gambar_utama}
-            alt={berita.judul}
-            loading="lazy"
-            className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
-          />
-        ) : (
-          <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-[var(--color-secondary)] to-[var(--color-primary)] text-white/40">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2" />
-              <path d="M18 14h-8" />
-              <path d="M15 18h-5" />
-              <path d="M10 6h8v4h-8V6Z" />
-            </svg>
-          </div>
-        )}
+        <SafeImage
+          src={berita.gambar_utama}
+          alt={berita.judul}
+          className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
+        />
         {berita.kategori && (
           <div className="absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-white/90 text-[var(--color-primary)]">
             {berita.kategori}
