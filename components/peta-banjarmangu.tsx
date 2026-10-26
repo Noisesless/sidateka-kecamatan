@@ -29,16 +29,12 @@ export default function PetaBanjarmangu() {
     });
     mapInstanceRef.current = map;
 
-    // Base layer: Esri (tanpa API key, bebas untuk situs publik).
-    // tile.openstreetmap.org memblokir situs produksi (Tile Usage Policy);
-    // CARTO basemaps kini mewajibkan API key — keduanya tidak dipakai.
-    const esriStreet = L.tileLayer(
-      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
-      {
-        attribution: "Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS",
-        maxZoom: 18,
-      },
-    );
+    // Base layer: OpenStreetMap (OSM) standar
+    const osm = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors',
+    });
     const esriTopo = L.tileLayer(
       "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
       {
@@ -54,10 +50,10 @@ export default function PetaBanjarmangu() {
         maxZoom: 18,
       },
     );
-    esriStreet.addTo(map);
+    osm.addTo(map);
     L.control
       .layers(
-        { "Peta Jalan": esriStreet, "Peta Topografi": esriTopo, "Citra Satelit": esriSatelit },
+        { "OpenStreetMap": osm, "Peta Topografi": esriTopo, "Citra Satelit": esriSatelit },
         {},
         { position: "topright" },
       )
