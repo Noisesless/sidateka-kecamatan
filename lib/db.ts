@@ -357,7 +357,9 @@ export const db = (() => {
 
 // Utilitas auth bersama (sumber tunggal — dipakai seed.ts & auth.ts)
 export function hashPassword(plain: string): string {
-  return crypto.createHash("sha256").update(plain).digest("hex");
+  const salt = crypto.randomBytes(16).toString("hex");
+  const derived = crypto.pbkdf2Sync(plain, salt, 100000, 32, "sha256").toString("hex");
+  return `pbkdf2:${salt}:${derived}`;
 }
 
 export type Desa = {

@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { ensureInitialized } from '@/lib/init';
 import { syncAllDesa, syncDesa } from '@/lib/sync';
 import { db, type Desa } from '@/lib/db';
+import { getCurrentUser } from '@/lib/auth';
 
 // Mencegah caching - hasil selalu dinamis
 export const dynamic = 'force-dynamic';
@@ -9,15 +10,21 @@ export const maxDuration = 300; // 5 menit
 
 export async function POST(req: NextRequest) {
   await ensureInitialized();
+
+  const token = req.headers.get('x-sync-token') || req.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
+  const expectedToken = process.env.SYNC_TOKEN || process.env.CRON_SECRET;
+  const user = await getCurrentUser();
+
+  const isAuthorized = !!user || (!!expectedToken && token === expectedToken);
+  if (!isAuthorized) {
+    return Response.json(
+      { ok: false, error: 'Unauthorized: login admin diperlukan atau sertakan x-sync-token valid' },
+      { status: 401 }
+    );
+  }
+
   const body = await req.json().catch(() => ({}));
   const slug = typeof body?.slug === 'string' ? body.slug : null;
-  const token = req.headers.get('x-sync-token');
-  const expected = process.env.SYNC_TOKEN;
-
-  // Token hanya wajib bila diset di env; di dev kosong = tidak dicek
-  if (expected && token !== expected) {
-    return Response.json({ ok: false, error: 'token tidak valid' }, { status: 401 });
-  }
 
   if (slug) {
     const desa = db.prepare('SELECT * FROM desa WHERE slug = ?').get(slug) as Desa | undefined;

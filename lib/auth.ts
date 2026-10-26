@@ -1,14 +1,36 @@
 import crypto from "node:crypto";
 import { cookies } from "next/headers";
-import { db, hashPassword } from "@/lib/db";
+import { db } from "@/lib/db";
 
 const COOKIE_NAME = "admin_session";
 const SESSION_TTL = 60 * 60 * 24 * 7; // 7 days
 
-export { hashPassword };
+export function hashPassword(plain: string): string {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const derived = crypto.pbkdf2Sync(plain, salt, 100000, 32, "sha256").toString("hex");
+  return `pbkdf2:${salt}:${derived}`;
+}
 
-export function verifyPassword(plain: string, hash: string): boolean {
-  return hashPassword(plain) === hash;
+export function verifyPassword(plain: string, storedHash: string): boolean {
+  if (!storedHash || typeof storedHash !== "string") return false;
+
+  // Format baru ber-salt: pbkdf2:<salt>:<hash> (100.000 iterasi SHA-256)
+  if (storedHash.startsWith("pbkdf2:")) {
+    const parts = storedHash.split(":");
+    if (parts.length !== 3) return false;
+    const salt = parts[1];
+    const expected = parts[2];
+    const derived = crypto.pbkdf2Sync(plain, salt, 100000, 32, "sha256").toString("hex");
+    return crypto.timingSafeEqual(Buffer.from(derived, "utf-8"), Buffer.from(expected, "utf-8"));
+  }
+
+  // Format legacy (unsalted SHA-256): kompatibel mundur untuk akun awal
+  try {
+    const legacy = crypto.createHash("sha256").update(plain).digest("hex");
+    return crypto.timingSafeEqual(Buffer.from(legacy, "utf-8"), Buffer.from(storedHash, "utf-8"));
+  } catch {
+    return false;
+  }
 }
 
 export function createSession(userId: number): string {

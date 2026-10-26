@@ -14,11 +14,16 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const slug = typeof body?.slug === 'string' ? body.slug : null;
   const fireAndForget = !!body?.fireAndForget;
-  const token = req.headers.get('x-sync-token');
-  const expected = process.env.SYNC_TOKEN;
+  const token = req.headers.get('x-sync-token') || req.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
+  const expectedToken = process.env.SYNC_TOKEN || process.env.CRON_SECRET;
   const user = await getCurrentUser();
-  if (!user && expected && token !== expected) {
-    return Response.json({ ok: false, error: 'token tidak valid' }, { status: 401 });
+
+  const isAuthorized = !!user || (!!expectedToken && token === expectedToken);
+  if (!isAuthorized) {
+    return Response.json(
+      { ok: false, error: 'Unauthorized: login admin diperlukan atau sertakan x-sync-token valid' },
+      { status: 401 }
+    );
   }
 
   const run = async () => {

@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { getArtikelByDesaAndSlug, getRecentArtikel } from "@/lib/queries";
 import { ArticleCard } from "@/components/article-card";
 import { SafeImage } from "@/components/safe-image";
+import { isSafePublicUrl, sanitizeHtmlContent } from "@/lib/security";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -31,6 +32,9 @@ function stripHtml(html: string): string {
 async function fetchArticleContent(
   url: string
 ): Promise<{ ringkasan: string; konten: string } | null> {
+  // Anti-SSRF check: cegah server fetch ke IP loopback/privat/metadata
+  if (!isSafePublicUrl(url)) return null;
+
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 30_000);
@@ -101,14 +105,15 @@ async function fetchArticleContent(
 
     if (!konten) return null;
 
+    const safeKonten = sanitizeHtmlContent(konten);
     // Generate ringkasan from konten
-    const text = stripHtml(konten);
+    const text = stripHtml(safeKonten);
     const ringkasan =
       text.length > 280
         ? text.slice(0, text.slice(0, 280).lastIndexOf(" ") || 280) + " [...]"
         : text;
 
-    return { ringkasan, konten };
+    return { ringkasan, konten: safeKonten };
   } catch {
     return null;
   }

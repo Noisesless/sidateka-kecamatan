@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { ensureInitialized } from '@/lib/init';
 import { syncDesa } from '@/lib/sync';
 import { db, type Desa } from '@/lib/db';
+import { getCurrentUser } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -9,6 +10,19 @@ export const maxDuration = 60;
 // POST /api/sync/one  body: { slug: string, fireAndForget?: boolean }
 export async function POST(req: NextRequest) {
   await ensureInitialized();
+
+  const token = req.headers.get('x-sync-token') || req.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
+  const expectedToken = process.env.SYNC_TOKEN || process.env.CRON_SECRET;
+  const user = await getCurrentUser();
+
+  const isAuthorized = !!user || (!!expectedToken && token === expectedToken);
+  if (!isAuthorized) {
+    return Response.json(
+      { ok: false, error: 'Unauthorized: login admin diperlukan atau sertakan x-sync-token valid' },
+      { status: 401 }
+    );
+  }
+
   const body = await req.json().catch(() => ({}));
   const slug = typeof body?.slug === 'string' ? body.slug : null;
   const fireAndForget = !!body?.fireAndForget;

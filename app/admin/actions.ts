@@ -1,6 +1,6 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
@@ -19,7 +19,36 @@ import { STATUS_ADUAN, getBeritaById, getBeritaFotos, slugifyBerita } from "@/li
 import { saveUploadedImage, deleteUploadedImage } from "@/lib/upload";
 import type { Desa } from "@/lib/db";
 
+// Rate limiter in-memory untuk mitigasi Brute-Force pada Login Admin
+const loginRateLimit = new Map<string, { attempts: number; resetAt: number }>();
+
+function checkLoginRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const record = loginRateLimit.get(ip);
+  if (!record || record.resetAt < now) {
+    loginRateLimit.set(ip, { attempts: 1, resetAt: now + 5 * 60 * 1000 });
+    return true;
+  }
+  if (record.attempts >= 5) {
+    return false;
+  }
+  record.attempts += 1;
+  return true;
+}
+
 export async function loginAction(formData: FormData) {
+  const h = await headers();
+  const ip =
+    h.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    h.get("x-real-ip") ||
+    "unknown";
+
+  if (!checkLoginRateLimit(ip)) {
+    redirect(
+      `/admin/login?error=${encodeURIComponent("Terlalu banyak percobaan login gagal. Silakan coba 5 menit lagi.")}`
+    );
+  }
+
   const username = String(formData.get("username") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   if (!username || !password) {
@@ -31,10 +60,15 @@ export async function loginAction(formData: FormData) {
   if (!row || !verifyPassword(password, row.password_hash)) {
     redirect(`/admin/login?error=${encodeURIComponent("Username atau password salah")}`);
   }
+
+  // Login berhasil — bersihkan catatan rate limit IP
+  loginRateLimit.delete(ip);
+
   const token = createSession(row.id);
   const c = await cookies();
   c.set(SESSION_COOKIE, token, {
     httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
     maxAge: SESSION_TTL,

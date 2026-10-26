@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { db, type Desa, type Artikel } from './db';
 import { fetchStatistikDesa } from './analitik';
+import { isSafePublicUrl, sanitizeHtmlContent } from './security';
 
 const UPLOAD_DIR =
   process.env.UPLOAD_DIR || path.join(process.cwd(), '.data', 'uploads');
@@ -78,8 +79,8 @@ export async function downloadAndSaveImage(
   if (remoteUrl.startsWith('/foto/') || remoteUrl.startsWith('/')) {
     return remoteUrl;
   }
-  // Hanya proses URL http/https
-  if (!remoteUrl.startsWith('http://') && !remoteUrl.startsWith('https://')) {
+  // Hanya proses URL publik yang aman (Anti-SSRF guard)
+  if (!isSafePublicUrl(remoteUrl)) {
     return remoteUrl;
   }
 
@@ -784,12 +785,15 @@ function upsertArtikel(items: Artikel[], desaId: number): UpsertResult {
 
   const tx = db.transaction((rows: Artikel[]) => {
     for (const r of rows) {
+      const safeKonten = r.konten ? sanitizeHtmlContent(r.konten) : null;
+      const safeRow = { ...r, konten: safeKonten, desa_id: desaId };
+
       const existing = findExisting.get(desaId, r.slug) as
         | { id: number; published_at: string | null; gambar: string | null; ringkasan: string | null; konten: string | null }
         | undefined;
 
       if (!existing) {
-        insertStmt.run({ ...r, desa_id: desaId });
+        insertStmt.run(safeRow);
         newCount++;
         if (r.gambar && r.gambar.startsWith('/foto/')) {
           savedPhotosCount++;
@@ -803,7 +807,7 @@ function upsertArtikel(items: Artikel[], desaId: number): UpsertResult {
         if (isSameDate && hasLocalImage) {
           skippedCount++;
         } else {
-          updateStmt.run({ ...r, desa_id: desaId });
+          updateStmt.run(safeRow);
           updatedCount++;
         }
         if ((r.gambar && r.gambar.startsWith('/foto/')) || hasLocalImage) {
