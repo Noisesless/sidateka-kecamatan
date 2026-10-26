@@ -20,6 +20,9 @@ function openDatabase(): Database.Database {
   db.pragma('journal_mode = WAL');
   db.pragma('synchronous = NORMAL');
   db.pragma('foreign_keys = ON');
+  db.pragma('cache_size = -64000'); // 64 MB page cache di RAM
+  db.pragma('temp_store = MEMORY');  // Temp table & sorting di RAM
+  db.pragma('mmap_size = 268435456'); // 256 MB memory-mapped I/O
   return db;
 }
 
