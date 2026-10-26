@@ -11,6 +11,7 @@ import {
   changePasswordAction,
 } from "./actions";
 import SyncAllButton from "@/components/sync-all-button";
+import SyncSingleButton from "@/components/sync-single-button";
 
 export const dynamic = "force-dynamic";
 
@@ -141,11 +142,16 @@ export default async function AdminDashboardPage({
             Kelola Unduhan
           </Link>
         </div>
-        <div className="flex flex-wrap gap-2 items-start">
-          <SyncAllButton />
-          <code className="inline-flex items-center px-3 py-2.5 rounded-lg bg-[var(--color-muted)] text-xs font-mono text-[var(--color-foreground)] self-center">
-            POST /api/sync/run
-          </code>
+        <div className="w-full">
+          <SyncAllButton
+            desaList={desa.map((d) => ({
+              id: d.id,
+              nama: d.nama,
+              slug: d.slug,
+              website: d.website,
+              is_active: d.is_active,
+            }))}
+          />
         </div>
       </div>
 
@@ -223,17 +229,8 @@ export default async function AdminDashboardPage({
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <div className="inline-flex gap-1">
-                      <form action={triggerSyncAction}>
-                        <input type="hidden" name="slug" value={d.slug} />
-                        <button
-                          type="submit"
-                          title="Sinkron desa ini"
-                          className="px-2.5 py-1.5 rounded-md border border-[var(--color-border)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] text-xs font-semibold"
-                        >
-                          Sync
-                        </button>
-                      </form>
+                    <div className="inline-flex items-center gap-1">
+                      <SyncSingleButton desaNama={d.nama} desaSlug={d.slug} />
                       <Link
                         href={`/admin/desa/${d.id}`}
                         title="Kelola API key & setelan push"

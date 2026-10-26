@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { ensureInitialized } from '@/lib/init';
 import { syncAllDesa, syncDesa } from '@/lib/sync';
 import { db, type Desa } from '@/lib/db';
+import { getCurrentUser } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 600; // 10 menit, fallback kalau maxDuration di server action kena timeout
@@ -15,7 +16,8 @@ export async function POST(req: NextRequest) {
   const fireAndForget = !!body?.fireAndForget;
   const token = req.headers.get('x-sync-token');
   const expected = process.env.SYNC_TOKEN;
-  if (expected && token !== expected) {
+  const user = await getCurrentUser();
+  if (!user && expected && token !== expected) {
     return Response.json({ ok: false, error: 'token tidak valid' }, { status: 401 });
   }
 
@@ -30,7 +32,7 @@ export async function POST(req: NextRequest) {
       db.prepare(
         "UPDATE desa SET last_sync_at = datetime('now'), last_sync_status = ?, last_sync_message = ? WHERE id = ?",
       ).run(result.status, result.message, desa.id);
-      return { ok: true, result };
+      return { ok: true, result, desaNama: desa.nama, desaSlug: desa.slug };
     }
     const results = await syncAllDesa();
     return {
