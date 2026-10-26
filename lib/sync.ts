@@ -200,10 +200,23 @@ async function fetchText(url: string, timeoutMs = FETCH_TIMEOUT): Promise<string
       if (!res.ok) {
         const text = await res.text().catch(() => '');
         const snippet = text.slice(0, 200).replace(/\s+/g, ' ');
-        // Retry hanya untuk 403/408/429/503/504 (Cloudflare/challenge)
-        if ([403, 408, 429, 502, 503, 504].includes(res.status) && attempt < maxAttempts) {
-          // Jeda acak 2-5 detik untuk menghindari rate limit
-          const delay = 2000 + Math.floor(Math.random() * 3000);
+
+        // Cloudflare Challenge (403 "Just a moment..."): retry dari IP yang sama tidak akan berhasil.
+        // Langsung lempar error agar tidak membuang 25 detik per desa!
+        const isCloudflare =
+          res.status === 403 &&
+          (snippet.includes('Just a moment') ||
+            snippet.includes('challenge-platform') ||
+            snippet.includes('Cloudflare') ||
+            snippet.includes('Attention Required'));
+
+        if (isCloudflare) {
+          throw new Error(`Cloudflare WAF 403 (Just a moment...)`);
+        }
+
+        // Retry hanya untuk 408/429/502/503/504
+        if ([408, 429, 502, 503, 504].includes(res.status) && attempt < maxAttempts) {
+          const delay = 1500 + Math.floor(Math.random() * 1500);
           await new Promise((r) => setTimeout(r, delay));
           continue;
         }
@@ -1324,8 +1337,10 @@ export async function syncDesa(desa: Desa): Promise<SyncResult> {
     errors.push(`rss: ${(e as Error).message}`);
   }
 
-  // Strategi 2 (fallback): HTML scrape — jika dua strategi di atas kosong/gagal
-  if (items.length === 0 && desa.scraper_enabled) {
+  const isCloudflareBlocked = errors.some((err) => err.includes('Cloudflare WAF'));
+
+  // Strategi 2 (fallback): HTML scrape — lewati jika sudah terbukti diblokir Cloudflare WAF
+  if (items.length === 0 && desa.scraper_enabled && !isCloudflareBlocked) {
     try {
       const scraped = await fetchScrape(desa);
       if (scraped.length > 0) {
@@ -1337,11 +1352,10 @@ export async function syncDesa(desa: Desa): Promise<SyncResult> {
     }
   }
 
-  // Sinkron halaman profil & lembaga desa (mengikuti izin scraper_enabled).
-  // Kegagalan di sini tidak menggagalkan sinkron artikel.
+  // Sinkron halaman profil & lembaga desa (hanya jika tidak terblokir Cloudflare WAF)
   let profilMsg = '';
   let statistikMsg = '';
-  if (desa.scraper_enabled) {
+  if (desa.scraper_enabled && !isCloudflareBlocked) {
     try {
       profilMsg = await fetchProfilDesa(desa);
     } catch (e) {
@@ -1451,3 +1465,103 @@ export async function syncAllDesa(): Promise<Array<{ desa: Desa; result: SyncRes
   }
   return out;
 }
+
+/* ====================== FAST PRE-FLIGHT CONNECTIVITY PROBE ====================== */
+
+export type DesaProbeStatus = 'online' | 'blocked_waf' | 'offline';
+
+export type DesaProbeResult = {
+  id: number;
+  nama: string;
+  slug: string;
+  website: string;
+  feed_url: string | null;
+  status: DesaProbeStatus;
+  message: string;
+  latencyMs: number;
+};
+
+export async function probeDesaConnectivity(desa: Desa): Promise<DesaProbeResult> {
+  const start = Date.now();
+  const targetUrl = desa.feed_url || desa.website;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4000); // Max 4 detik timeout
+
+  try {
+    const res = await fetch(targetUrl, {
+      method: 'GET',
+      headers: {
+        'User-Agent': UAS[0],
+        Accept: 'text/html,application/rss+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Cache-Control': 'no-cache',
+      },
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    const latencyMs = Date.now() - start;
+
+    if (res.status === 403) {
+      const text = await res.text().catch(() => '');
+      const isCf =
+        text.includes('Just a moment') ||
+        text.includes('challenge-platform') ||
+        text.includes('Cloudflare') ||
+        text.includes('Attention Required');
+      return {
+        id: desa.id,
+        nama: desa.nama,
+        slug: desa.slug,
+        website: desa.website,
+        feed_url: desa.feed_url,
+        status: 'blocked_waf',
+        message: isCf ? 'Cloudflare WAF Challenge (403)' : 'Akses Ditolak (403)',
+        latencyMs,
+      };
+    }
+
+    if (res.ok) {
+      return {
+        id: desa.id,
+        nama: desa.nama,
+        slug: desa.slug,
+        website: desa.website,
+        feed_url: desa.feed_url,
+        status: 'online',
+        message: 'Online & Siap Sync',
+        latencyMs,
+      };
+    }
+
+    return {
+      id: desa.id,
+      nama: desa.nama,
+      slug: desa.slug,
+      website: desa.website,
+      feed_url: desa.feed_url,
+      status: 'offline',
+      message: `HTTP ${res.status} ${res.statusText}`,
+      latencyMs,
+    };
+  } catch (err: unknown) {
+    clearTimeout(timer);
+    const latencyMs = Date.now() - start;
+    const isTimeout = (err as Error).name === 'AbortError';
+    return {
+      id: desa.id,
+      nama: desa.nama,
+      slug: desa.slug,
+      website: desa.website,
+      feed_url: desa.feed_url,
+      status: 'offline',
+      message: isTimeout ? 'Timeout (>4s)' : ((err as Error).message || 'Gagal terhubung'),
+      latencyMs,
+    };
+  }
+}
+
+export async function probeAllDesa(): Promise<DesaProbeResult[]> {
+  const rows = db.prepare('SELECT * FROM desa WHERE is_active = 1').all() as Desa[];
+  // Jalankan SEMUA desa secara PARALEL untuk kecepatan instan (3-4 detik total)
+  return Promise.all(rows.map((d) => probeDesaConnectivity(d)));
+}
+

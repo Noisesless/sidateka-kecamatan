@@ -14,11 +14,21 @@ export type DesaSyncItem = {
 type SyncLogItem = {
   nama: string;
   slug: string;
-  status: "ok" | "failed";
+  status: "ok" | "failed" | "skipped";
   message: string;
   newCount: number;
   updatedCount: number;
   durationMs: number;
+};
+
+type ProbeItem = {
+  id: number;
+  nama: string;
+  slug: string;
+  website: string;
+  status: "online" | "blocked_waf" | "offline";
+  message: string;
+  latencyMs: number;
 };
 
 type Props = {
@@ -28,11 +38,13 @@ type Props = {
 
 export default function SyncAllButton({
   desaList = [],
-  label = "Sync Semua Desa",
 }: Props) {
   const router = useRouter();
 
   const [running, setRunning] = useState(false);
+  const [probing, setProbing] = useState(false);
+  const [probeResults, setProbeResults] = useState<ProbeItem[] | null>(null);
+
   const [currentDesa, setCurrentDesa] = useState<DesaSyncItem | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [totalDesa, setTotalDesa] = useState(0);
@@ -43,6 +55,7 @@ export default function SyncAllButton({
   const [summary, setSummary] = useState({
     success: 0,
     failed: 0,
+    skipped: 0,
     newArticles: 0,
     updatedArticles: 0,
   });
@@ -52,12 +65,49 @@ export default function SyncAllButton({
 
   const activeList = desaList.filter((d) => !!d.is_active);
 
-  const handleStartSync = async () => {
-    if (running) return;
+  // Jalankan cek konektivitas paralel untuk seluruh desa (selesai dalam 2-4 detik)
+  const runProbe = async (): Promise<ProbeItem[]> => {
+    setProbing(true);
+    setTickerText("Memeriksa konektivitas 17 desa secara paralel (3 detik)…");
+    try {
+      const res = await fetch("/api/sync/probe", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.ok && Array.isArray(data.results)) {
+        setProbeResults(data.results);
+        setTickerText(
+          `Hasil koneksi: ${data.onlineCount} desa online, ${data.blockedCount} terblokir Cloudflare WAF.`
+        );
+        return data.results as ProbeItem[];
+      }
+    } catch (e: unknown) {
+      setTickerText(`Gagal cek koneksi: ${(e as Error).message}`);
+    } finally {
+      setProbing(false);
+    }
+    return [];
+  };
 
-    const targetList = activeList.length > 0 ? activeList : desaList;
+  // Mulai proses sync (opsi: onlineOnly)
+  const handleStartSync = async (onlineOnly = true) => {
+    if (running || probing) return;
+
+    let targetProbe = probeResults;
+    // Jika belum dicek dan memilih onlineOnly, lakukan probe terlebih dahulu
+    if (onlineOnly && (!targetProbe || targetProbe.length === 0)) {
+      targetProbe = await runProbe();
+    }
+
+    let targetList: DesaSyncItem[] = activeList.length > 0 ? activeList : desaList;
+
+    if (onlineOnly && targetProbe && targetProbe.length > 0) {
+      const onlineSlugs = new Set(
+        targetProbe.filter((p) => p.status === "online").map((p) => p.slug)
+      );
+      targetList = targetList.filter((d) => onlineSlugs.has(d.slug));
+    }
+
     if (targetList.length === 0) {
-      alert("Tidak ada desa aktif untuk disinkronkan.");
+      alert("Tidak ada desa online yang terdeteksi untuk disinkronkan.");
       return;
     }
 
@@ -66,7 +116,7 @@ export default function SyncAllButton({
     setCurrentIndex(0);
     setTotalDesa(targetList.length);
     setLogs([]);
-    setSummary({ success: 0, failed: 0, newArticles: 0, updatedArticles: 0 });
+    setSummary({ success: 0, failed: 0, skipped: 0, newArticles: 0, updatedArticles: 0 });
     cancelRequestedRef.current = false;
 
     let successCount = 0;
@@ -170,6 +220,7 @@ export default function SyncAllButton({
       setSummary({
         success: successCount,
         failed: failedCount,
+        skipped: 0,
         newArticles: totalNew,
         updatedArticles: totalUpdated,
       });
@@ -189,14 +240,19 @@ export default function SyncAllButton({
   const progressPercent =
     totalDesa > 0 ? Math.min(100, Math.round((currentIndex / totalDesa) * 100)) : 0;
 
+  const onlineCount = probeResults?.filter((p) => p.status === "online").length;
+  const blockedCount = probeResults?.filter((p) => p.status === "blocked_waf").length;
+
   return (
     <div className="w-full flex flex-col gap-3">
-      {/* Tombol Kontrol */}
+      {/* Bar Kontrol & Pilihan Smart Sync */}
       <div className="flex flex-wrap items-center gap-2">
+        {/* Tombol Utama: Sync Cepat (Hanya Desa Online) */}
         <button
           type="button"
-          onClick={handleStartSync}
-          disabled={running}
+          onClick={() => handleStartSync(true)}
+          disabled={running || probing}
+          title="Filter desa yang bisa terhubung secara instan, lalu sync hanya yang online (Selesai ~15 detik)"
           className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[var(--color-primary)] hover:bg-[var(--color-foreground)] disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all shadow-sm active:scale-95"
         >
           <svg
@@ -208,7 +264,7 @@ export default function SyncAllButton({
             strokeWidth="2.5"
             strokeLinecap="round"
             strokeLinejoin="round"
-            className={running ? "animate-spin" : ""}
+            className={running || probing ? "animate-spin" : ""}
           >
             <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
             <path d="M3 3v5h5" />
@@ -216,13 +272,44 @@ export default function SyncAllButton({
             <path d="M16 16h5v5" />
           </svg>
           <span>
-            {running
+            {probing
+              ? "Memeriksa Koneksi (3s)…"
+              : running
               ? `Menyinkronkan (${currentIndex}/${totalDesa})…`
-              : isFinished
-              ? "Ulangi Sync Semua Desa"
-              : label}
+              : onlineCount !== undefined
+              ? `Sync Cepat (${onlineCount} Desa Online)`
+              : "Sync Cepat (Hanya Desa Online)"}
           </span>
         </button>
+
+        {/* Tombol Cek Koneksi Saja */}
+        <button
+          type="button"
+          onClick={() => runProbe()}
+          disabled={running || probing}
+          title="Pindai status konektivitas 17 desa secara paralel tanpa menjalankan sinkronisasi data"
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--color-border)] bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 disabled:opacity-60 transition-colors shadow-2xs"
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M2 12h20" />
+            <path d="M20 12l-4-4" />
+            <path d="M20 12l-4 4" />
+          </svg>
+          <span>{probing ? "Mengecek…" : "Cek Koneksi (3s)"}</span>
+        </button>
+
+        {/* Tombol Opsi: Sync Semua 17 Desa (Paksa) */}
+        {!running && (
+          <button
+            type="button"
+            onClick={() => handleStartSync(false)}
+            disabled={running || probing}
+            title="Sinkronkan seluruh 17 desa secara berurutan termasuk yang diblokir Cloudflare"
+            className="px-2.5 py-1.5 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors underline"
+          >
+            Sync Semua 17 Desa (Paksa)
+          </button>
+        )}
 
         {running && (
           <button
@@ -250,13 +337,29 @@ export default function SyncAllButton({
         )}
       </div>
 
-      {/* Progress & Info Card (Aktif saat running atau setelah selesai) */}
-      {(running || isFinished) && (
+      {/* Badge Hasil Probe Konektivitas Cepat */}
+      {probeResults && !running && (
+        <div className="flex flex-wrap items-center gap-2 text-xs py-1 px-3 bg-slate-50 border border-slate-200 rounded-lg">
+          <span className="font-semibold text-slate-600">Status Koneksi 17 Desa:</span>
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">
+            ● {onlineCount} Online
+          </span>
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold">
+            ● {blockedCount} Terblokir Cloudflare WAF
+          </span>
+          <span className="text-[11px] text-slate-500">
+            (Hanya desa online yang akan disinkronkan untuk menghemat waktu)
+          </span>
+        </div>
+      )}
+
+      {/* Progress & Info Card (Aktif saat running, probing, atau selesai) */}
+      {(running || probing || isFinished) && (
         <div className="rounded-xl border border-[var(--color-border)] bg-gradient-to-b from-white to-slate-50/70 p-4 sm:p-5 shadow-sm transition-all duration-300">
           {/* Header Info Desa Aktif */}
           <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
             <div className="flex items-center gap-2.5">
-              {running ? (
+              {running || probing ? (
                 <span className="relative flex h-3 w-3">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-600"></span>
@@ -267,12 +370,16 @@ export default function SyncAllButton({
 
               <div>
                 <div className="text-xs font-bold uppercase tracking-wider text-[var(--color-primary)]">
-                  {running
+                  {probing
+                    ? "Pengecekan Konektivitas Paralel"
+                    : running
                     ? `Sedang Sinkronisasi (${currentIndex} dari ${totalDesa} Desa)`
                     : "Sinkronisasi Selesai"}
                 </div>
                 <div className="text-sm font-bold text-[var(--color-foreground)]">
-                  {running && currentDesa
+                  {probing
+                    ? "Memindai 17 domain desa secara simultan…"
+                    : running && currentDesa
                     ? `Desa ${currentDesa.nama}`
                     : `Selesai memproses ${totalDesa} desa`}
                 </div>
@@ -281,10 +388,10 @@ export default function SyncAllButton({
 
             <div className="text-right">
               <span className="font-mono text-base font-bold text-[var(--color-primary)]">
-                {progressPercent}%
+                {probing ? "100%" : `${progressPercent}%`}
               </span>
               <div className="text-[10px] text-[var(--color-muted-foreground)]">
-                {currentIndex} / {totalDesa} Desa
+                {probing ? "Pindai Selesai" : `${currentIndex} / ${totalDesa} Desa`}
               </div>
             </div>
           </div>
@@ -297,7 +404,7 @@ export default function SyncAllButton({
                   ? "bg-emerald-500"
                   : "bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-500"
               }`}
-              style={{ width: `${progressPercent}%` }}
+              style={{ width: probing ? "100%" : `${progressPercent}%` }}
             />
           </div>
 
@@ -310,24 +417,26 @@ export default function SyncAllButton({
           )}
 
           {/* Mini Counters Tally */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
-            <div className="px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200/70 text-emerald-800 flex items-center justify-between text-xs font-semibold">
-              <span>Berhasil</span>
-              <span className="font-mono font-bold text-sm">{summary.success}</span>
+          {!probing && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
+              <div className="px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200/70 text-emerald-800 flex items-center justify-between text-xs font-semibold">
+                <span>Berhasil</span>
+                <span className="font-mono font-bold text-sm">{summary.success}</span>
+              </div>
+              <div className="px-3 py-1.5 rounded-lg bg-rose-50 border border-rose-200/70 text-rose-800 flex items-center justify-between text-xs font-semibold">
+                <span>Gagal</span>
+                <span className="font-mono font-bold text-sm">{summary.failed}</span>
+              </div>
+              <div className="px-3 py-1.5 rounded-lg bg-blue-50 border border-blue-200/70 text-blue-800 flex items-center justify-between text-xs font-semibold">
+                <span>Artikel Baru</span>
+                <span className="font-mono font-bold text-sm">{summary.newArticles}</span>
+              </div>
+              <div className="px-3 py-1.5 rounded-lg bg-indigo-50 border border-indigo-200/70 text-indigo-800 flex items-center justify-between text-xs font-semibold">
+                <span>Diperbarui</span>
+                <span className="font-mono font-bold text-sm">{summary.updatedArticles}</span>
+              </div>
             </div>
-            <div className="px-3 py-1.5 rounded-lg bg-rose-50 border border-rose-200/70 text-rose-800 flex items-center justify-between text-xs font-semibold">
-              <span>Gagal</span>
-              <span className="font-mono font-bold text-sm">{summary.failed}</span>
-            </div>
-            <div className="px-3 py-1.5 rounded-lg bg-blue-50 border border-blue-200/70 text-blue-800 flex items-center justify-between text-xs font-semibold">
-              <span>Artikel Baru</span>
-              <span className="font-mono font-bold text-sm">{summary.newArticles}</span>
-            </div>
-            <div className="px-3 py-1.5 rounded-lg bg-indigo-50 border border-indigo-200/70 text-indigo-800 flex items-center justify-between text-xs font-semibold">
-              <span>Diperbarui</span>
-              <span className="font-mono font-bold text-sm">{summary.updatedArticles}</span>
-            </div>
-          </div>
+          )}
 
           {/* Toggle Log Rincian */}
           {logs.length > 0 && (
