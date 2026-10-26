@@ -50,7 +50,16 @@ export async function logoutAction() {
   redirect("/admin/login");
 }
 
+async function assertAdminSession() {
+  const user = await getCurrentUser();
+  if (!user) {
+    redirect(`/admin/login?error=${encodeURIComponent("Sesi telah berakhir, silakan login kembali")}`);
+  }
+  return user;
+}
+
 export async function triggerSyncAction(formData: FormData) {
+  await assertAdminSession();
   const slug = String(formData.get("slug") ?? "").trim() || null;
   try {
     if (slug) {
@@ -91,6 +100,7 @@ export async function triggerSyncAction(formData: FormData) {
 }
 
 export async function toggleActiveAction(formData: FormData) {
+  await assertAdminSession();
   const id = parseInt(String(formData.get("id") ?? "0"), 10);
   if (!id) {
     redirect(`/admin?error=${encodeURIComponent("ID tidak valid")}`);
@@ -102,6 +112,7 @@ export async function toggleActiveAction(formData: FormData) {
 }
 
 export async function updateDesaAction(formData: FormData) {
+  await assertAdminSession();
   const id = parseInt(String(formData.get("id") ?? "0"), 10);
   if (!id) {
     redirect(`/admin?error=${encodeURIComponent("ID tidak valid")}`);
@@ -150,6 +161,7 @@ export async function changePasswordAction(formData: FormData) {
 /* ====================== API KEY MANAGEMENT ====================== */
 
 export async function generateApiKeyAction(formData: FormData) {
+  await assertAdminSession();
   const desaId = parseInt(String(formData.get("desa_id") ?? "0"), 10);
   if (!desaId) {
     redirect(`/admin?error=${encodeURIComponent("ID desa tidak valid")}`);
@@ -176,6 +188,7 @@ export async function generateApiKeyAction(formData: FormData) {
 }
 
 export async function revokeApiKeyAction(formData: FormData) {
+  await assertAdminSession();
   const desaId = parseInt(String(formData.get("desa_id") ?? "0"), 10);
   if (!desaId) {
     redirect(`/admin?error=${encodeURIComponent("ID desa tidak valid")}`);
@@ -186,6 +199,7 @@ export async function revokeApiKeyAction(formData: FormData) {
 }
 
 export async function reactivateApiKeyAction(formData: FormData) {
+  await assertAdminSession();
   const desaId = parseInt(String(formData.get("desa_id") ?? "0"), 10);
   if (!desaId) {
     redirect(`/admin?error=${encodeURIComponent("ID desa tidak valid")}`);
@@ -196,6 +210,7 @@ export async function reactivateApiKeyAction(formData: FormData) {
 }
 
 export async function deleteApiKeyAction(formData: FormData) {
+  await assertAdminSession();
   const desaId = parseInt(String(formData.get("desa_id") ?? "0"), 10);
   if (!desaId) {
     redirect(`/admin?error=${encodeURIComponent("ID desa tidak valid")}`);
@@ -208,6 +223,7 @@ export async function deleteApiKeyAction(formData: FormData) {
 /* ====================== PROFIL KECAMATAN ====================== */
 
 export async function saveProfilKecamatanAction(formData: FormData) {
+  await assertAdminSession();
   const nama_kecamatan = String(formData.get("nama_kecamatan") ?? "").trim();
   const kabupaten = String(formData.get("kabupaten") ?? "").trim();
   const provinsi = String(formData.get("provinsi") ?? "").trim();
@@ -261,6 +277,7 @@ export async function saveProfilKecamatanAction(formData: FormData) {
 }
 
 export async function scrapeProfilAction(formData: FormData) {
+  await assertAdminSession();
   const url = String(formData.get("website_sumber") ?? "https://banjarmangu.banjarnegarakab.go.id/");
   try {
     const html = await fetch(url, {
@@ -322,6 +339,7 @@ export async function scrapeProfilAction(formData: FormData) {
 /* ====================== STATISTIK SINKRONISASI ====================== */
 
 export async function triggerSyncStatistikAction() {
+  await assertAdminSession();
   try {
     const result = await scrapeAllStatistik();
     revalidatePath("/statistik");
@@ -360,6 +378,7 @@ function ensureUnduhanTable() {
 }
 
 export async function createUnduhanAction(formData: FormData) {
+  await assertAdminSession();
   ensureUnduhanTable();
   const kategori = String(formData.get("kategori") ?? "").trim();
   const judul = String(formData.get("judul") ?? "").trim();
@@ -385,6 +404,7 @@ export async function createUnduhanAction(formData: FormData) {
 }
 
 export async function updateUnduhanAction(formData: FormData) {
+  await assertAdminSession();
   const id = parseInt(String(formData.get("id") ?? "0"), 10);
   if (!id) {
     redirect(`/admin/unduhan?error=${encodeURIComponent("ID tidak valid")}`);
@@ -416,6 +436,7 @@ export async function updateUnduhanAction(formData: FormData) {
 }
 
 export async function deleteUnduhanAction(formData: FormData) {
+  await assertAdminSession();
   const id = parseInt(String(formData.get("id") ?? "0"), 10);
   if (!id) {
     redirect(`/admin/unduhan?error=${encodeURIComponent("ID tidak valid")}`);
@@ -428,6 +449,7 @@ export async function deleteUnduhanAction(formData: FormData) {
 }
 
 export async function togglePublishUnduhanAction(formData: FormData) {
+  await assertAdminSession();
   const id = parseInt(String(formData.get("id") ?? "0"), 10);
   if (!id) {
     redirect(`/admin/unduhan?error=${encodeURIComponent("ID tidak valid")}`);
@@ -441,6 +463,7 @@ export async function togglePublishUnduhanAction(formData: FormData) {
 /* ====================== ADUAN MASYARAKAT ====================== */
 
 export async function updateAduanAction(formData: FormData) {
+  await assertAdminSession();
   const id = parseInt(String(formData.get("id") ?? "0"), 10);
   const status = String(formData.get("status") ?? "").trim();
   const tanggapan = String(formData.get("tanggapan") ?? "").trim() || null;
@@ -460,6 +483,7 @@ export async function updateAduanAction(formData: FormData) {
 }
 
 export async function deleteAduanAction(formData: FormData) {
+  await assertAdminSession();
   const id = parseInt(String(formData.get("id") ?? "0"), 10);
   if (!id) {
     redirect(`/admin/aduan?error=${encodeURIComponent("ID tidak valid")}`);
@@ -526,6 +550,7 @@ async function simpanFotoTambahan(artikelId: number, formData: FormData): Promis
 }
 
 export async function createBeritaAction(formData: FormData) {
+  await assertAdminSession();
   const judul = String(formData.get("judul") ?? "").trim();
   const ringkasan = String(formData.get("ringkasan") ?? "").trim() || null;
   const konten = String(formData.get("konten") ?? "").trim() || null;
@@ -564,6 +589,7 @@ export async function createBeritaAction(formData: FormData) {
 }
 
 export async function updateBeritaAction(formData: FormData) {
+  await assertAdminSession();
   const id = parseInt(String(formData.get("id") ?? "0"), 10);
   if (!id) {
     redirect(`/admin/berita?error=${encodeURIComponent("ID tidak valid")}`);
@@ -619,6 +645,7 @@ export async function updateBeritaAction(formData: FormData) {
 }
 
 export async function deleteBeritaAction(formData: FormData) {
+  await assertAdminSession();
   const id = parseInt(String(formData.get("id") ?? "0"), 10);
   if (!id) {
     redirect(`/admin/berita?error=${encodeURIComponent("ID tidak valid")}`);
@@ -637,6 +664,7 @@ export async function deleteBeritaAction(formData: FormData) {
 }
 
 export async function togglePublishBeritaAction(formData: FormData) {
+  await assertAdminSession();
   const id = parseInt(String(formData.get("id") ?? "0"), 10);
   if (!id) {
     redirect(`/admin/berita?error=${encodeURIComponent("ID tidak valid")}`);
@@ -649,6 +677,7 @@ export async function togglePublishBeritaAction(formData: FormData) {
 }
 
 export async function deleteBeritaFotoAction(formData: FormData) {
+  await assertAdminSession();
   const id = parseInt(String(formData.get("id") ?? "0"), 10);
   const artikelId = parseInt(String(formData.get("artikel_id") ?? "0"), 10);
   if (!id || !artikelId) {
@@ -667,8 +696,7 @@ export async function deleteBeritaFotoAction(formData: FormData) {
 
 // ===== Kelola artikel hasil sinkron (per desa) =====
 export async function deleteArtikelDesaAction(formData: FormData) {
-  const user = await getCurrentUser();
-  if (!user) redirect("/admin/login");
+  await assertAdminSession();
 
   const artikelId = Number(formData.get("artikel_id") ?? 0);
   const desaId = Number(formData.get("desa_id") ?? 0);
@@ -710,8 +738,7 @@ export async function deleteArtikelDesaAction(formData: FormData) {
 
 // ===== Profil & lembaga desa (hasil sinkron) =====
 export async function saveProfilUrlsAction(formData: FormData) {
-  const user = await getCurrentUser();
-  if (!user) redirect("/admin/login");
+  await assertAdminSession();
 
   const desaId = Number(formData.get("desa_id") ?? 0);
   if (!desaId) redirect("/admin/desa");
@@ -736,8 +763,7 @@ export async function saveProfilUrlsAction(formData: FormData) {
 }
 
 export async function deleteProfilDesaAction(formData: FormData) {
-  const user = await getCurrentUser();
-  if (!user) redirect("/admin/login");
+  await assertAdminSession();
 
   const id = Number(formData.get("profil_id") ?? 0);
   const desaId = Number(formData.get("desa_id") ?? 0);

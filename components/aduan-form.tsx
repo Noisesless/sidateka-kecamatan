@@ -106,6 +106,18 @@ export function AduanForm({
 
   return (
     <form onSubmit={onSubmit} className="rounded-2xl border border-[var(--color-border)] bg-white p-5 sm:p-7 space-y-5">
+      {/* Honeypot field untuk proteksi bot anti-spam (SP-007) */}
+      <div className="hidden" aria-hidden="true" style={{ display: 'none' }}>
+        <label htmlFor="website_url_hp">Website</label>
+        <input
+          type="text"
+          id="website_url_hp"
+          name="website_url_hp"
+          tabIndex={-1}
+          autoComplete="off"
+        />
+      </div>
+
       {error && (
         <div className="p-3 rounded-lg bg-[var(--color-destructive)]/10 text-[var(--color-destructive)] text-sm border border-[var(--color-destructive)]/20">
           {error}

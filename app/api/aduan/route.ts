@@ -4,6 +4,25 @@ import { db } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
+// In-memory sliding window rate limiter (SP-007)
+const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000; // 10 menit
+const MAX_REQUESTS_PER_WINDOW = 5; // Maksimal 5 aduan per 10 menit per IP
+const ipHits = new Map<string, { count: number; resetAt: number }>();
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const record = ipHits.get(ip);
+  if (!record || now > record.resetAt) {
+    ipHits.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+  if (record.count >= MAX_REQUESTS_PER_WINDOW) {
+    return false;
+  }
+  record.count += 1;
+  return true;
+}
+
 // GET /api/aduan?nomor=ADM-YYYYMMDD-XXXX → tracking publik (nomor = kunci akses)
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -31,11 +50,28 @@ export async function GET(request: Request) {
 
 // POST /api/aduan → buat aduan baru, kembalikan nomor tracking
 export async function POST(request: Request) {
+  const ip =
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    request.headers.get('x-real-ip') ||
+    'unknown';
+
+  if (ip !== 'unknown' && !checkRateLimit(ip)) {
+    return NextResponse.json(
+      { error: 'Terlalu banyak permintaan aduan. Mohon tunggu beberapa saat sebelum mengirim aduan baru.' },
+      { status: 429 },
+    );
+  }
+
   let body: Record<string, unknown>;
   try {
     body = (await request.json()) as Record<string, unknown>;
   } catch {
     return NextResponse.json({ error: 'Body harus JSON' }, { status: 400 });
+  }
+
+  // Honeypot anti-bot: jika field jebakan diisi, tolak permintaan
+  if (body['website_url_hp']) {
+    return NextResponse.json({ error: 'Invalid submission' }, { status: 400 });
   }
 
   const str = (k: string) => String(body[k] ?? '').trim();
