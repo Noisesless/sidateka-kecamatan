@@ -145,10 +145,10 @@ export function Navbar({ desa }: NavbarProps) {
     setMobileOpen(false);
   }, [pathname]);
 
-  // Tutup saat resize ke desktop
+  // Tutup saat resize ke desktop (breakpoint xl 1280px agar optimal di laptop 1366px)
   useEffect(() => {
     const onResize = () => {
-      if (window.innerWidth >= 768) setMobileOpen(false);
+      if (window.innerWidth >= 1280) setMobileOpen(false);
     };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
@@ -170,33 +170,33 @@ export function Navbar({ desa }: NavbarProps) {
   return (
     <header className="sticky top-0 z-40 w-full bg-white/90 backdrop-blur-md border-b border-[var(--color-border)]">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-16 items-center justify-between gap-4">
+        <div className="flex h-16 items-center justify-between gap-3 sm:gap-4">
           {/* Brand */}
-          <Link href="/" className="flex items-center gap-2.5 group cursor-pointer">
+          <Link href="/" className="flex items-center gap-2.5 group cursor-pointer min-w-0">
             <img
               src="/logo.png"
               alt="Logo Kecamatan"
-              className="h-9 w-9 rounded-lg shadow-sm group-hover:scale-105 transition-transform object-contain"
+              className="h-9 w-9 rounded-lg shadow-sm group-hover:scale-105 transition-transform object-contain shrink-0"
             />
-            <div className="block leading-tight">
-              <div className="font-serif text-base font-semibold text-[var(--color-foreground)]">
+            <div className="block leading-tight min-w-0">
+              <div className="font-serif text-sm sm:text-base font-semibold text-[var(--color-foreground)] truncate">
                 SIDATEKA BANJARMANGU
               </div>
-              <div className="text-[10px] uppercase tracking-widest text-[var(--color-muted-foreground)]">
+              <div className="text-[10px] uppercase tracking-widest text-[var(--color-muted-foreground)] truncate max-w-[190px] xs:max-w-[240px] sm:max-w-none">
                 Sistim Informasi Desa Terintegrasi Kecamatan
               </div>
             </div>
           </Link>
 
-          {/* Desktop nav */}
+          {/* Desktop nav (Optimal di laptop 1366px: 8 menu + Analitik) */}
           <nav
-            className="hidden md:flex items-center gap-1"
+            className="hidden xl:flex items-center gap-1 shrink-0"
             style={{ listStyle: "none" }}
           >
             <DesktopNavItems items={NAV_LINKS} />
             <Link
               href="/analitik"
-              className="ml-2 inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-semibold text-[var(--color-primary-foreground)] bg-[var(--color-primary)] hover:bg-[var(--color-foreground)] rounded-md transition-colors cursor-pointer"
+              className="ml-2 inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-semibold text-[var(--color-primary-foreground)] bg-[var(--color-primary)] hover:bg-[var(--color-foreground)] rounded-md transition-colors cursor-pointer shrink-0"
             >
               Analitik
               <svg
@@ -215,12 +215,12 @@ export function Navbar({ desa }: NavbarProps) {
             </Link>
           </nav>
 
-          {/* Mobile hamburger */}
-          <div className="md:hidden flex items-center gap-2">
+          {/* Mobile & Tablet hamburger (< 1280px) */}
+          <div className="xl:hidden flex items-center gap-2 shrink-0">
             <button
               type="button"
               onClick={() => setMobileOpen((v) => !v)}
-              className="p-2 rounded-md hover:bg-[var(--color-muted)] transition-colors"
+              className="p-2 rounded-md hover:bg-[var(--color-muted)] transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
               aria-label="Toggle menu"
               aria-expanded={mobileOpen}
             >
@@ -260,8 +260,8 @@ export function Navbar({ desa }: NavbarProps) {
 
         {/* Mobile menu (slide-down panel) */}
         <div
-          className={`md:hidden overflow-hidden transition-[max-height,opacity] duration-300 ease-in-out ${
-            mobileOpen ? "max-h-[80vh] opacity-100" : "max-h-0 opacity-0"
+          className={`xl:hidden overflow-hidden transition-[max-height,opacity] duration-300 ease-in-out ${
+            mobileOpen ? "max-h-[80vh] opacity-100 overflow-y-auto" : "max-h-0 opacity-0"
           }`}
         >
           <div

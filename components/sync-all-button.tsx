@@ -65,22 +65,22 @@ export default function SyncAllButton({
 
   const activeList = desaList.filter((d) => !!d.is_active);
 
-  // Jalankan cek konektivitas paralel untuk seluruh desa (selesai dalam 2-4 detik)
+  // Jalankan cek konektivitas paralel untuk seluruh desa
   const runProbe = async (): Promise<ProbeItem[]> => {
     setProbing(true);
-    setTickerText("Memeriksa konektivitas 17 desa secara paralel (3 detik)…");
+    setTickerText("Memeriksa status domain desa…");
     try {
       const res = await fetch("/api/sync/probe", { method: "POST" });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.ok && Array.isArray(data.results)) {
         setProbeResults(data.results);
         setTickerText(
-          `Hasil koneksi: ${data.onlineCount} desa online, ${data.blockedCount} terblokir Cloudflare WAF.`
+          `${data.onlineCount} dari ${data.total} desa siap disinkronkan.`
         );
         return data.results as ProbeItem[];
       }
     } catch (e: unknown) {
-      setTickerText(`Gagal cek koneksi: ${(e as Error).message}`);
+      setTickerText(`Pemeriksaan gagal: ${(e as Error).message}`);
     } finally {
       setProbing(false);
     }
@@ -92,7 +92,6 @@ export default function SyncAllButton({
     if (running || probing) return;
 
     let targetProbe = probeResults;
-    // Jika belum dicek dan memilih onlineOnly, lakukan probe terlebih dahulu
     if (onlineOnly && (!targetProbe || targetProbe.length === 0)) {
       targetProbe = await runProbe();
     }
@@ -107,7 +106,7 @@ export default function SyncAllButton({
     }
 
     if (targetList.length === 0) {
-      alert("Tidak ada desa online yang terdeteksi untuk disinkronkan.");
+      alert("Tidak ada desa aktif yang dapat dihubungi saat ini.");
       return;
     }
 
@@ -126,14 +125,14 @@ export default function SyncAllButton({
 
     for (let i = 0; i < targetList.length; i++) {
       if (cancelRequestedRef.current) {
-        setTickerText("Sinkronisasi dihentikan oleh pengguna.");
+        setTickerText("Sinkronisasi dihentikan.");
         break;
       }
 
       const d = targetList[i];
       setCurrentDesa(d);
       setCurrentIndex(i + 1);
-      setTickerText(`Menghubungi ${d.nama} (${d.website})…`);
+      setTickerText(`Menghubungi ${d.nama}…`);
 
       const startTime = Date.now();
 
@@ -150,7 +149,7 @@ export default function SyncAllButton({
         if (!res.ok || !data.ok) {
           failedCount += 1;
           const errMsg = data?.error || res.statusText || "Gagal menghubungi";
-          setTickerText(`Gagal: ${d.nama} (${errMsg})`);
+          setTickerText(`Gagal: ${d.nama}`);
           setLogs((prev) => [
             {
               nama: d.nama,
@@ -179,12 +178,12 @@ export default function SyncAllButton({
 
           const desc =
             nNew > 0
-              ? `+${nNew} artikel baru`
+              ? `+${nNew} baru`
               : nUpd > 0
-              ? `${nUpd} artikel update`
-              : "data up to date";
+              ? `${nUpd} diperbarui`
+              : "Data mutakhir";
 
-          setTickerText(`Selesai: ${d.nama} (${desc}, ${(durationMs / 1000).toFixed(1)}s)`);
+          setTickerText(`${d.nama}: ${desc} (${(durationMs / 1000).toFixed(1)}s)`);
 
           setLogs((prev) => [
             {
@@ -201,8 +200,8 @@ export default function SyncAllButton({
         }
       } catch (err: unknown) {
         failedCount += 1;
-        const msg = err instanceof Error ? err.message : "Error jaringan";
-        setTickerText(`Error: ${d.nama} (${msg})`);
+        const msg = err instanceof Error ? err.message : "Gangguan jaringan";
+        setTickerText(`Gagal: ${d.nama}`);
         setLogs((prev) => [
           {
             nama: d.nama,
@@ -234,30 +233,28 @@ export default function SyncAllButton({
 
   const handleCancel = () => {
     cancelRequestedRef.current = true;
-    setTickerText("Menghentikan proses setelah desa saat ini selesai…");
+    setTickerText("Menghentikan proses…");
   };
 
   const progressPercent =
     totalDesa > 0 ? Math.min(100, Math.round((currentIndex / totalDesa) * 100)) : 0;
 
   const onlineCount = probeResults?.filter((p) => p.status === "online").length;
-  const blockedCount = probeResults?.filter((p) => p.status === "blocked_waf").length;
 
   return (
     <div className="w-full flex flex-col gap-3">
-      {/* Bar Kontrol & Pilihan Smart Sync */}
+      {/* Bar Kontrol */}
       <div className="flex flex-wrap items-center gap-2">
-        {/* Tombol Utama: Sync Cepat (Hanya Desa Online) */}
+        {/* Tombol Utama */}
         <button
           type="button"
           onClick={() => handleStartSync(true)}
           disabled={running || probing}
-          title="Filter desa yang bisa terhubung secara instan, lalu sync hanya yang online (Selesai ~15 detik)"
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[var(--color-primary)] hover:bg-[var(--color-foreground)] disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all shadow-sm active:scale-95"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--color-primary)] hover:bg-[var(--color-foreground)] disabled:opacity-60 disabled:cursor-not-allowed text-white text-xs sm:text-sm font-semibold transition-all shadow-2xs active:scale-[0.98]"
         >
           <svg
-            width="15"
-            height="15"
+            width="14"
+            height="14"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -273,41 +270,40 @@ export default function SyncAllButton({
           </svg>
           <span>
             {probing
-              ? "Memeriksa Koneksi (3s)…"
+              ? "Memeriksa…"
               : running
               ? `Menyinkronkan (${currentIndex}/${totalDesa})…`
-              : onlineCount !== undefined
-              ? `Sync Cepat (${onlineCount} Desa Online)`
-              : "Sync Cepat (Hanya Desa Online)"}
+              : "Sinkronkan"}
           </span>
+          {!running && !probing && onlineCount !== undefined && (
+            <span className="px-1.5 py-0.5 rounded text-[11px] bg-white/20 font-mono">
+              {onlineCount} Siap
+            </span>
+          )}
         </button>
 
-        {/* Tombol Cek Koneksi Saja */}
+        {/* Tombol Cek Status */}
         <button
           type="button"
           onClick={() => runProbe()}
           disabled={running || probing}
-          title="Pindai status konektivitas 17 desa secara paralel tanpa menjalankan sinkronisasi data"
-          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--color-border)] bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 disabled:opacity-60 transition-colors shadow-2xs"
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--color-border)] bg-white hover:bg-slate-50 text-xs font-medium text-slate-700 disabled:opacity-60 transition-colors shadow-2xs"
         >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M2 12h20" />
-            <path d="M20 12l-4-4" />
-            <path d="M20 12l-4 4" />
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
           </svg>
-          <span>{probing ? "Mengecek…" : "Cek Koneksi (3s)"}</span>
+          <span>{probing ? "Memeriksa…" : "Periksa Status"}</span>
         </button>
 
-        {/* Tombol Opsi: Sync Semua 17 Desa (Paksa) */}
+        {/* Tombol Opsi: Sinkron Semua */}
         {!running && (
           <button
             type="button"
             onClick={() => handleStartSync(false)}
             disabled={running || probing}
-            title="Sinkronkan seluruh 17 desa secara berurutan termasuk yang diblokir Cloudflare"
-            className="px-2.5 py-1.5 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors underline"
+            className="px-2.5 py-2 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors underline"
           >
-            Sync Semua 17 Desa (Paksa)
+            Sinkron Semua (17 Desa)
           </button>
         )}
 
@@ -315,14 +311,14 @@ export default function SyncAllButton({
           <button
             type="button"
             onClick={handleCancel}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold transition-colors"
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10" />
               <line x1="15" y1="9" x2="9" y2="15" />
               <line x1="9" y1="9" x2="15" y2="15" />
             </svg>
-            Batal
+            <span>Batal</span>
           </button>
         )}
 
@@ -330,130 +326,140 @@ export default function SyncAllButton({
           <button
             type="button"
             onClick={() => setIsFinished(false)}
-            className="px-2.5 py-1.5 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
+            className="px-2.5 py-2 text-xs text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] transition-colors"
           >
-            Tutup Panel
+            Tutup
           </button>
         )}
       </div>
 
-      {/* Badge Hasil Probe Konektivitas Cepat */}
+      {/* Ringkasan Status Pemeriksaan Desa */}
       {probeResults && !running && (
-        <div className="flex flex-wrap items-center gap-2 text-xs py-1 px-3 bg-slate-50 border border-slate-200 rounded-lg">
-          <span className="font-semibold text-slate-600">Status Koneksi 17 Desa:</span>
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">
-            ● {onlineCount} Online
-          </span>
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold">
-            ● {blockedCount} Terblokir Cloudflare WAF
-          </span>
-          <span className="text-[11px] text-slate-500">
-            (Hanya desa online yang akan disinkronkan untuk menghemat waktu)
-          </span>
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs py-1.5 px-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-600">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-slate-700">Status:</span>
+            <span className="inline-flex items-center gap-1 text-emerald-700 font-medium">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              {onlineCount} aktif
+            </span>
+            <span className="text-slate-300">·</span>
+            <span className="text-slate-500">
+              {desaList.length - (onlineCount ?? 0)} tidak merespons
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setProbeResults(null)}
+            className="text-[11px] text-slate-400 hover:text-slate-600 transition-colors"
+          >
+            Tutup
+          </button>
         </div>
       )}
 
-      {/* Progress & Info Card (Aktif saat running, probing, atau selesai) */}
+      {/* Progress & Result Card */}
       {(running || probing || isFinished) && (
-        <div className="rounded-xl border border-[var(--color-border)] bg-gradient-to-b from-white to-slate-50/70 p-4 sm:p-5 shadow-sm transition-all duration-300">
-          {/* Header Info Desa Aktif */}
+        <div className="rounded-xl border border-[var(--color-border)] bg-white p-4 sm:p-5 shadow-2xs transition-all duration-300">
+          {/* Header Info */}
           <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
             <div className="flex items-center gap-2.5">
-              {running || probing ? (
-                <span className="relative flex h-3 w-3">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-600"></span>
-                </span>
-              ) : (
-                <span className="inline-flex h-3 w-3 rounded-full bg-emerald-500"></span>
-              )}
-
+              <span
+                className={`inline-flex h-2.5 w-2.5 rounded-full ${
+                  running || probing
+                    ? "bg-blue-600 animate-pulse"
+                    : summary.failed > 0 && summary.success === 0
+                    ? "bg-rose-500"
+                    : "bg-emerald-500"
+                }`}
+              />
               <div>
-                <div className="text-xs font-bold uppercase tracking-wider text-[var(--color-primary)]">
+                <div className="text-xs font-semibold text-[var(--color-muted-foreground)]">
                   {probing
-                    ? "Pengecekan Konektivitas Paralel"
+                    ? "Pemeriksaan Status"
                     : running
-                    ? `Sedang Sinkronisasi (${currentIndex} dari ${totalDesa} Desa)`
+                    ? "Sinkronisasi Berjalan"
                     : "Sinkronisasi Selesai"}
                 </div>
                 <div className="text-sm font-bold text-[var(--color-foreground)]">
                   {probing
-                    ? "Memindai 17 domain desa secara simultan…"
+                    ? "Memeriksa domain desa"
                     : running && currentDesa
                     ? `Desa ${currentDesa.nama}`
-                    : `Selesai memproses ${totalDesa} desa`}
+                    : `${totalDesa} desa selesai diproses`}
                 </div>
               </div>
             </div>
 
             <div className="text-right">
-              <span className="font-mono text-base font-bold text-[var(--color-primary)]">
+              <span className="font-mono text-sm sm:text-base font-bold text-[var(--color-primary)]">
                 {probing ? "100%" : `${progressPercent}%`}
               </span>
               <div className="text-[10px] text-[var(--color-muted-foreground)]">
-                {probing ? "Pindai Selesai" : `${currentIndex} / ${totalDesa} Desa`}
+                {probing ? "Selesai" : `${currentIndex} / ${totalDesa} Desa`}
               </div>
             </div>
           </div>
 
           {/* Bar Progress */}
-          <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden border border-slate-200/80 mb-3 p-0.5">
+          <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden mb-3">
             <div
               className={`h-full rounded-full transition-all duration-300 ease-out ${
                 isFinished && summary.failed === 0
-                  ? "bg-emerald-500"
-                  : "bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-500"
+                  ? "bg-emerald-600"
+                  : "bg-[var(--color-primary)]"
               }`}
               style={{ width: probing ? "100%" : `${progressPercent}%` }}
             />
           </div>
 
-          {/* Ticker Simpel: Teks Berjalan / Status Terakhir */}
+          {/* Ticker / Status Terakhir */}
           {tickerText && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-slate-200 text-xs font-medium text-slate-700 mb-3 shadow-2xs">
-              <span className="inline-block h-2 w-2 rounded-full bg-blue-500 animate-pulse"></span>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-slate-50 border border-slate-200 text-xs text-slate-700 mb-3">
+              <span className="h-1.5 w-1.5 rounded-full bg-slate-400 shrink-0" />
               <span className="truncate">{tickerText}</span>
             </div>
           )}
 
-          {/* Mini Counters Tally */}
+          {/* Metrik Tally Ringkas */}
           {!probing && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
-              <div className="px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200/70 text-emerald-800 flex items-center justify-between text-xs font-semibold">
-                <span>Berhasil</span>
-                <span className="font-mono font-bold text-sm">{summary.success}</span>
+              <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs">
+                <span className="text-slate-600 font-medium">Berhasil</span>
+                <span className="font-mono font-bold text-emerald-700">{summary.success}</span>
               </div>
-              <div className="px-3 py-1.5 rounded-lg bg-rose-50 border border-rose-200/70 text-rose-800 flex items-center justify-between text-xs font-semibold">
-                <span>Gagal</span>
-                <span className="font-mono font-bold text-sm">{summary.failed}</span>
+              <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs">
+                <span className="text-slate-600 font-medium">Gagal</span>
+                <span className={`font-mono font-bold ${summary.failed > 0 ? "text-rose-600" : "text-slate-400"}`}>
+                  {summary.failed}
+                </span>
               </div>
-              <div className="px-3 py-1.5 rounded-lg bg-blue-50 border border-blue-200/70 text-blue-800 flex items-center justify-between text-xs font-semibold">
-                <span>Artikel Baru</span>
-                <span className="font-mono font-bold text-sm">{summary.newArticles}</span>
+              <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs">
+                <span className="text-slate-600 font-medium">Artikel Baru</span>
+                <span className="font-mono font-bold text-slate-800">{summary.newArticles}</span>
               </div>
-              <div className="px-3 py-1.5 rounded-lg bg-indigo-50 border border-indigo-200/70 text-indigo-800 flex items-center justify-between text-xs font-semibold">
-                <span>Diperbarui</span>
-                <span className="font-mono font-bold text-sm">{summary.updatedArticles}</span>
+              <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs">
+                <span className="text-slate-600 font-medium">Diperbarui</span>
+                <span className="font-mono font-bold text-slate-800">{summary.updatedArticles}</span>
               </div>
             </div>
           )}
 
           {/* Toggle Log Rincian */}
           {logs.length > 0 && (
-            <div className="mt-2 pt-2 border-t border-slate-200/60">
+            <div className="mt-2 pt-2 border-t border-slate-100">
               <button
                 type="button"
                 onClick={() => setShowLogs(!showLogs)}
-                className="text-xs font-semibold text-[var(--color-primary)] hover:underline inline-flex items-center gap-1"
+                className="text-xs font-medium text-[var(--color-primary)] hover:underline inline-flex items-center gap-1"
               >
-                <span>{showLogs ? "Sembunyikan Riwayat Desa" : `Lihat Riwayat Desa (${logs.length})`}</span>
+                <span>{showLogs ? "Sembunyikan Rincian" : `Rincian Desa (${logs.length})`}</span>
                 <svg
                   width="12"
                   height="12"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth="2.5"
+                  strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   className={`transition-transform duration-200 ${showLogs ? "rotate-180" : ""}`}
@@ -467,15 +473,15 @@ export default function SyncAllButton({
                   {logs.map((item, idx) => (
                     <div
                       key={idx}
-                      className="flex items-center justify-between py-1 px-2 rounded bg-white border border-slate-100"
+                      className="flex items-center justify-between py-1.5 px-2.5 rounded bg-slate-50 border border-slate-100"
                     >
                       <div className="flex items-center gap-2 truncate">
                         <span
-                          className={`inline-block h-2 w-2 rounded-full ${
+                          className={`inline-block h-1.5 w-1.5 rounded-full ${
                             item.status === "ok" ? "bg-emerald-500" : "bg-rose-500"
                           }`}
                         />
-                        <span className="font-semibold">{item.nama}</span>
+                        <span className="font-semibold text-slate-800">{item.nama}</span>
                         <span className="text-[11px] text-[var(--color-muted-foreground)] truncate">
                           {item.message}
                         </span>

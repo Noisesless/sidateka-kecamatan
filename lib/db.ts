@@ -254,6 +254,13 @@ function ensureSchemaSync(db: Database.Database) {
     );
   `);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_statistik_desa ON statistik_penduduk(desa_id, tahun);`);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS statistik_snapshot (
+      key TEXT PRIMARY KEY,
+      data_json TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS unduhan (
@@ -518,3 +525,28 @@ export type ArtikelKecamatanFoto = {
 
 // Dipakai oleh lib/init.ts untuk ensureSchema idempotent
 export { ensureSchemaSync };
+
+export function getStatistikSnapshot<T>(key: string): { data: T; updated_at: string } | null {
+  try {
+    const row = db.prepare('SELECT data_json, updated_at FROM statistik_snapshot WHERE key = ?').get(key) as { data_json: string; updated_at: string } | undefined;
+    if (!row) return null;
+    return { data: JSON.parse(row.data_json) as T, updated_at: row.updated_at };
+  } catch {
+    return null;
+  }
+}
+
+export function saveStatistikSnapshot(key: string, data: any): void {
+  try {
+    db.prepare(`
+      INSERT INTO statistik_snapshot (key, data_json, updated_at)
+      VALUES (?, ?, datetime('now'))
+      ON CONFLICT(key) DO UPDATE SET
+        data_json = excluded.data_json,
+        updated_at = datetime('now')
+    `).run(key, JSON.stringify(data));
+  } catch (err) {
+    console.error(`Failed to save statistik snapshot ${key}:`, err);
+  }
+}
+

@@ -77,26 +77,59 @@ export default async function ArtikelIndexPage({
       </header>
 
       {/* Filter desa */}
-      <div className="mb-8 overflow-x-auto no-scrollbar -mx-4 sm:mx-0 px-4 sm:px-0">
-        <div className="flex gap-2 min-w-min pb-2">
+      <div className="mb-8 rounded-2xl border border-[var(--color-border)] bg-white p-4 sm:p-5 shadow-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2.5 border-b border-[var(--color-border)]/60">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[var(--color-primary)]">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+            </svg>
+            <span>Filter Berdasarkan Desa</span>
+            <span className="text-[11px] font-normal text-[var(--color-muted-foreground)]">
+              ({desaList.length} Desa)
+            </span>
+          </div>
+          {selectedDesa && (
+            <Link
+              href="/artikel"
+              className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-destructive)] hover:underline"
+            >
+              Reset Filter
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </Link>
+          )}
+        </div>
+
+        <div className="flex flex-wrap gap-1.5 sm:gap-2">
           <Link
             href="/artikel"
-            className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+            className={`px-3 sm:px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all ${
               !selectedDesa
-                ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)]"
-                : "bg-white text-[var(--color-foreground)] border-[var(--color-border)] hover:border-[var(--color-primary)]"
+                ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)] shadow-xs"
+                : "bg-[var(--color-background)]/60 text-[var(--color-foreground)] border-[var(--color-border)] hover:bg-white hover:border-[var(--color-primary)]"
             }`}
           >
-            Semua
+            Semua Desa
           </Link>
           {desaList.map((d) => (
             <Link
               key={d.id}
               href={`/artikel?desa=${d.slug}`}
-              className={`flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+              className={`px-3 sm:px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all ${
                 selectedDesa?.id === d.id
-                  ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)]"
-                  : "bg-white text-[var(--color-foreground)] border-[var(--color-border)] hover:border-[var(--color-primary)]"
+                  ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)] shadow-xs"
+                  : "bg-[var(--color-background)]/60 text-[var(--color-foreground)] border-[var(--color-border)] hover:bg-white hover:border-[var(--color-primary)]"
               }`}
             >
               {d.nama}

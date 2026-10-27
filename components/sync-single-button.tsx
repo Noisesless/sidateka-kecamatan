@@ -42,7 +42,7 @@ export default function SyncSingleButton({
         const isWaf = errorMsg.toLowerCase().includes("cloudflare") || errorMsg.includes("403");
         setBadge({
           type: "error",
-          text: isWaf ? "⚠ Terblokir WAF" : "⚠ Gagal",
+          text: isWaf ? "Gagal (403)" : "Gagal",
           detail: `${errorMsg} (${durationSec}s)`,
         });
       } else {
@@ -51,10 +51,10 @@ export default function SyncSingleButton({
         const updatedCount = r?.updatedCount ?? 0;
         const text =
           newCount > 0
-            ? `✓ +${newCount} baru`
+            ? `+${newCount} baru`
             : updatedCount > 0
-            ? `✓ ${updatedCount} update`
-            : "✓ Selesai";
+            ? `${updatedCount} update`
+            : "Selesai";
 
         setBadge({
           type: "success",
@@ -68,7 +68,7 @@ export default function SyncSingleButton({
       const msg = err instanceof Error ? err.message : "Error koneksi";
       setBadge({
         type: "error",
-        text: "⚠ Error",
+        text: "Gagal",
         detail: `${msg} (${durationSec}s)`,
       });
     } finally {
@@ -93,14 +93,19 @@ export default function SyncSingleButton({
         {/* Badge Hasil Sukses / Error dengan tooltip rincian */}
         {badge && !loading && (
           <span
-            className={`text-[11px] font-bold px-2 py-0.5 rounded-md border shadow-2xs transition-all duration-200 cursor-help ${
+            className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md border shadow-2xs transition-all duration-200 cursor-help ${
               badge.type === "success"
                 ? "bg-emerald-50 text-emerald-800 border-emerald-300"
                 : "bg-rose-50 text-rose-800 border-rose-300"
             }`}
             title={badge.detail || badge.text}
           >
-            {badge.text}
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${
+                badge.type === "success" ? "bg-emerald-600" : "bg-rose-600"
+              }`}
+            />
+            <span>{badge.text}</span>
           </span>
         )}
 

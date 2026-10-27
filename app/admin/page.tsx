@@ -78,6 +78,57 @@ export default async function AdminDashboardPage({
         </div>
       )}
 
+      {/* Menu Navigasi Admin */}
+      <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 mb-6">
+        <Link
+          href="/admin/aduan"
+          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-[var(--color-border)] bg-white hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] text-xs sm:text-sm font-medium transition-colors shadow-2xs"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          </svg>
+          <span>Aduan</span>
+          {aduanStats.baru > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full bg-[var(--color-primary)] text-white text-[10px] font-bold">
+              {aduanStats.baru}
+            </span>
+          )}
+        </Link>
+        <Link
+          href="/admin/profil"
+          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-[var(--color-border)] bg-white hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] text-xs sm:text-sm font-medium transition-colors shadow-2xs"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+          </svg>
+          <span>Profil Kecamatan</span>
+        </Link>
+        <Link
+          href="/admin/berita"
+          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-[var(--color-border)] bg-white hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] text-xs sm:text-sm font-medium transition-colors shadow-2xs"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2" />
+            <path d="M18 14h-8" />
+            <path d="M15 18h-5" />
+            <path d="M10 6h8v4h-8V6Z" />
+          </svg>
+          <span>Berita Kecamatan</span>
+        </Link>
+        <Link
+          href="/admin/unduhan"
+          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-[var(--color-border)] bg-white hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] text-xs sm:text-sm font-medium transition-colors shadow-2xs"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          <span>Kelola Unduhan</span>
+        </Link>
+      </div>
+
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
         <StatTile label="Desa" value={stats.totalDesa} />
@@ -92,55 +143,11 @@ export default async function AdminDashboardPage({
 
       {/* Sync action */}
       <div className="rounded-2xl border border-[var(--color-border)] bg-white p-5 sm:p-6 mb-6">
-        <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
-          <div>
-            <h2 className="font-serif text-lg font-bold">Sinkronisasi</h2>
-            <p className="text-sm text-[var(--color-muted-foreground)]">
-              Tarik artikel terbaru dari website desa
-            </p>
-          </div>
-          <Link
-            href="/admin/aduan"
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[var(--color-primary)] hover:bg-[var(--color-foreground)] text-white text-sm font-semibold transition-colors"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-            </svg>
-            Aduan{aduanStats.baru > 0 ? ` (${aduanStats.baru} baru)` : ""}
-          </Link>
-          <Link
-            href="/admin/profil"
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[var(--color-warning)] hover:bg-amber-600 text-white text-sm font-semibold transition-colors"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-            </svg>
-            Profil Kecamatan
-          </Link>
-          <Link
-            href="/admin/berita"
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-[var(--color-border)] bg-white hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] text-sm font-semibold transition-colors"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2" />
-              <path d="M18 14h-8" />
-              <path d="M15 18h-5" />
-              <path d="M10 6h8v4h-8V6Z" />
-            </svg>
-            Berita Kecamatan
-          </Link>
-          <Link
-            href="/admin/unduhan"
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-[var(--color-border)] bg-white hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] text-sm font-semibold transition-colors"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-            Kelola Unduhan
-          </Link>
+        <div className="mb-4">
+          <h2 className="font-serif text-lg font-bold">Sinkronisasi Artikel</h2>
+          <p className="text-sm text-[var(--color-muted-foreground)]">
+            Tarik artikel terbaru dari website desa
+          </p>
         </div>
         <div className="w-full">
           <SyncAllButton

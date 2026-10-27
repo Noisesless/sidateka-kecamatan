@@ -158,8 +158,7 @@ export default function PetaBanjarmangu() {
     <>
       <div
         ref={mapRef}
-        className="w-full rounded-xl border border-[var(--color-border)] overflow-hidden"
-        style={{ height: "500px" }}
+        className="w-full h-[320px] sm:h-[420px] md:h-[500px] rounded-xl border border-[var(--color-border)] overflow-hidden"
       />
       <style>{`
         /* Konsistensi Font Aplikasi pada Seluruh Elemen Leaflet */

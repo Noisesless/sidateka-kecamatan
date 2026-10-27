@@ -13,9 +13,9 @@ export function Footer() {
   const stats = getArtikelStats();
 
   return (
-    <footer className="hidden md:block mt-24 border-t border-[var(--color-border)] bg-white">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
+    <footer className="block mt-14 sm:mt-24 border-t border-[var(--color-border)] bg-white pb-6 md:pb-0">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 sm:py-12">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 md:gap-10">
           {/* Brand */}
           <div className="md:col-span-1">
             <div className="flex items-center gap-2.5 mb-3">

@@ -264,4 +264,10 @@ CREATE TABLE visitor_daily (
   date TEXT PRIMARY KEY,
   count INTEGER NOT NULL DEFAULT 0
 );
+
+CREATE TABLE statistik_snapshot (
+  cache_key TEXT PRIMARY KEY,
+  payload TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 ```

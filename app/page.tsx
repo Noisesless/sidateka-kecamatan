@@ -160,14 +160,14 @@ export default async function HomePage(props: {
             {/* Pagination dinamis ala OpenDK */}
             {totalPages > 1 && (
               <nav
-                className="flex items-center justify-center gap-1.5 pt-4"
+                className="flex flex-wrap items-center justify-center gap-1 sm:gap-1.5 pt-4"
                 aria-label="Navigasi Halaman"
               >
-                {/* Halaman Pertama */}
+                {/* Halaman Pertama (desktop/tablet) */}
                 {currentPage > 1 && (
                   <Link
                     href="/?page=1#kecamatan"
-                    className="min-w-9 h-9 grid place-items-center px-2 rounded-md border text-xs font-semibold transition-colors bg-white text-[var(--color-foreground)] border-[var(--color-border)] hover:bg-[var(--color-muted)]"
+                    className="hidden sm:grid min-w-9 h-9 place-items-center px-2 rounded-md border text-xs font-semibold transition-colors bg-white text-[var(--color-foreground)] border-[var(--color-border)] hover:bg-[var(--color-muted)]"
                     title="Halaman Pertama"
                   >
                     «
@@ -178,7 +178,7 @@ export default async function HomePage(props: {
                 {currentPage > 1 && (
                   <Link
                     href={`/?page=${currentPage - 1}#kecamatan`}
-                    className="min-w-9 h-9 grid place-items-center px-2 rounded-md border text-xs font-semibold transition-colors bg-white text-[var(--color-foreground)] border-[var(--color-border)] hover:bg-[var(--color-muted)]"
+                    className="min-w-9 h-9 grid place-items-center px-2.5 rounded-md border text-xs font-semibold transition-colors bg-white text-[var(--color-foreground)] border-[var(--color-border)] hover:bg-[var(--color-muted)]"
                     title="Halaman Sebelumnya"
                   >
                     ‹
@@ -192,7 +192,7 @@ export default async function HomePage(props: {
                     <Link
                       key={p}
                       href={`/?page=${p}#kecamatan`}
-                      className={`min-w-9 h-9 grid place-items-center px-3 rounded-md border text-sm font-semibold transition-colors ${
+                      className={`min-w-8 sm:min-w-9 h-8 sm:h-9 grid place-items-center px-2.5 sm:px-3 rounded-md border text-xs sm:text-sm font-semibold transition-colors ${
                         isActive
                           ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)] shadow-sm"
                           : "bg-white text-[var(--color-foreground)] border-[var(--color-border)] hover:bg-[var(--color-muted)]"
@@ -207,18 +207,18 @@ export default async function HomePage(props: {
                 {currentPage < totalPages && (
                   <Link
                     href={`/?page=${currentPage + 1}#kecamatan`}
-                    className="min-w-9 h-9 grid place-items-center px-2 rounded-md border text-xs font-semibold transition-colors bg-white text-[var(--color-foreground)] border-[var(--color-border)] hover:bg-[var(--color-muted)]"
+                    className="min-w-9 h-9 grid place-items-center px-2.5 rounded-md border text-xs font-semibold transition-colors bg-white text-[var(--color-foreground)] border-[var(--color-border)] hover:bg-[var(--color-muted)]"
                     title="Halaman Selanjutnya"
                   >
                     ›
                   </Link>
                 )}
 
-                {/* Halaman Terakhir */}
+                {/* Halaman Terakhir (desktop/tablet) */}
                 {currentPage < totalPages && (
                   <Link
                     href={`/?page=${totalPages}#kecamatan`}
-                    className="min-w-9 h-9 grid place-items-center px-2 rounded-md border text-xs font-semibold transition-colors bg-white text-[var(--color-foreground)] border-[var(--color-border)] hover:bg-[var(--color-muted)]"
+                    className="hidden sm:grid min-w-9 h-9 place-items-center px-2 rounded-md border text-xs font-semibold transition-colors bg-white text-[var(--color-foreground)] border-[var(--color-border)] hover:bg-[var(--color-muted)]"
                     title="Halaman Terakhir"
                   >
                     »

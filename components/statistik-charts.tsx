@@ -86,8 +86,13 @@ export function BarChartHorizontal({ data, maxItems = 15 }: { data: Array<{ labe
       {sorted.map((d, i) => {
         const pct = Math.max((Math.sqrt(d.value) / Math.sqrt(maxVal)) * 100, 5);
         return (
-          <div key={i} className="flex items-start gap-3">
-            <div className="w-52 text-sm text-[var(--color-muted-foreground)] flex-shrink-0 text-right leading-7 break-words">{d.label}</div>
+          <div key={i} className="flex items-start gap-2 sm:gap-3">
+            <div
+              className="w-28 sm:w-44 md:w-52 text-xs sm:text-sm text-[var(--color-muted-foreground)] flex-shrink-0 text-right leading-7 truncate"
+              title={d.label}
+            >
+              {d.label}
+            </div>
             <div className="flex-1 bg-gray-100 rounded-full h-7 relative overflow-hidden min-w-0">
               <div
                 className="h-full rounded-full flex items-center justify-end px-2 transition-all"

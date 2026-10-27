@@ -1,4 +1,4 @@
-import { db } from './db';
+import { db, getStatistikSnapshot, saveStatistikSnapshot } from './db';
 import { DESA_BANJARMANGU } from './seed';
 
 /**
@@ -39,6 +39,58 @@ const CHART_COLORS = [
   '#14b8a6', '#e11d48', '#a855f7', '#0ea5e9', '#facc15',
   '#64748b',
 ];
+
+// ─── Multi-Tier Cache Engine (L1 RAM + L2 SQLite Snapshot + SWR) ───
+
+const MEM_CACHE = new Map<string, { data: any; expiresAt: number }>();
+const DEFAULT_TTL_MS = 60 * 60 * 1000; // 1 Jam TTL
+
+export async function getOrFetchCached<T>(
+  key: string,
+  fetcher: () => Promise<T>,
+  ttlMs: number = DEFAULT_TTL_MS
+): Promise<T> {
+  // 1. Cek L1 In-Memory Cache (RAM) — sub-millisecond (< 0.1ms)
+  const mem = MEM_CACHE.get(key);
+  if (mem && Date.now() < mem.expiresAt) {
+    return mem.data as T;
+  }
+
+  // 2. Cek L2 SQLite Snapshot — ~1ms
+  const snap = getStatistikSnapshot<T>(key);
+  if (snap) {
+    MEM_CACHE.set(key, { data: snap.data, expiresAt: Date.now() + ttlMs });
+
+    // Background refresh jika snapshot sudah lebih tua dari TTL (Stale-While-Revalidate)
+    const snapAge = Date.now() - new Date(snap.updated_at).getTime();
+    if (snapAge > ttlMs) {
+      fetcher()
+        .then((fresh) => {
+          if (fresh) {
+            saveStatistikSnapshot(key, fresh);
+            MEM_CACHE.set(key, { data: fresh, expiresAt: Date.now() + ttlMs });
+          }
+        })
+        .catch(() => {});
+    }
+    return snap.data;
+  }
+
+  // 3. Cold Start: Jalankan fetcher jika belum ada data sama sekali
+  const fresh = await fetcher();
+  if (fresh) {
+    saveStatistikSnapshot(key, fresh);
+    MEM_CACHE.set(key, { data: fresh, expiresAt: Date.now() + ttlMs });
+  }
+  return fresh;
+}
+
+export function clearStatistikCache(): void {
+  MEM_CACHE.clear();
+  try {
+    db.prepare('DELETE FROM statistik_snapshot').run();
+  } catch {}
+}
 
 // ─── Types ───
 
@@ -176,17 +228,19 @@ export type StatistikKecamatanDirect = {
 
 /** Ambil daftar tahun yang tersedia di API */
 export async function getYearList(): Promise<YearList> {
-  try {
-    const res = await fetch(`${OPENDK_API}/statistik-penduduk/listYear`, {
-      next: { revalidate: 3600 }, // cache 1 jam
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const json = await res.json();
-    return json.data?.[0]?.attributes?.[0]?.tahun ?? [];
-  } catch (err) {
-    console.error('Gagal ambil list tahun:', err);
-    return [];
-  }
+  return getOrFetchCached<YearList>('year_list', async () => {
+    try {
+      const res = await fetch(`${OPENDK_API}/statistik-penduduk/listYear`, {
+        signal: AbortSignal.timeout(2500),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      return json.data?.[0]?.attributes?.[0]?.tahun ?? [new Date().getFullYear()];
+    } catch (err) {
+      console.error('Gagal ambil list tahun:', err);
+      return [new Date().getFullYear()];
+    }
+  }, 24 * 3600 * 1000);
 }
 
 /** Ambil data statistik penduduk dari API OpenDK */
@@ -311,6 +365,10 @@ export async function scrapeAllStatistik(): Promise<{
     failed = 1;
   }
 
+  if (success > 0) {
+    clearStatistikCache();
+  }
+
   return { success, failed, results };
 }
 
@@ -319,40 +377,42 @@ export async function scrapeAllStatistik(): Promise<{
 /** Ambil ringkasan statistik kecamatan dari API */
 export async function getStatistikKecamatanFromApi(tahun?: number) {
   const year = tahun ?? new Date().getFullYear();
-  const data = await getStatistikFromApi('', year);
+  return getOrFetchCached(`opendk_kecamatan_${year}`, async () => {
+    const data = await getStatistikFromApi('', year);
 
-  if (!data) {
+    if (!data) {
+      return {
+        desa_count: 16,
+        total_penduduk: 0,
+        total_laki_laki: 0,
+        total_perempuan: 0,
+        total_disabilitas: 0,
+        total_kk: 0,
+        ktp_wajib: 0,
+        ktp_terpenuhi: 0,
+        akta_terpenuhi: 0,
+        aktanikah_terpenuhi: 0,
+        last_update: null,
+        chart: null as ChartData | null,
+      };
+    }
+
+    const d = data.dashboard;
     return {
       desa_count: 16,
-      total_penduduk: 0,
-      total_laki_laki: 0,
-      total_perempuan: 0,
-      total_disabilitas: 0,
+      total_penduduk: d.total_penduduk,
+      total_laki_laki: d.total_lakilaki,
+      total_perempuan: d.total_perempuan,
+      total_disabilitas: d.total_disabilitas,
       total_kk: 0,
-      ktp_wajib: 0,
-      ktp_terpenuhi: 0,
-      akta_terpenuhi: 0,
-      aktanikah_terpenuhi: 0,
-      last_update: null,
-      chart: null as ChartData | null,
+      ktp_wajib: d.ktp_wajib,
+      ktp_terpenuhi: d.ktp_terpenuhi,
+      akta_terpenuhi: d.akta_terpenuhi,
+      aktanikah_terpenuhi: d.aktanikah_terpenuhi,
+      last_update: new Date().toISOString(),
+      chart: data.chart,
     };
-  }
-
-  const d = data.dashboard;
-  return {
-    desa_count: 16,
-    total_penduduk: d.total_penduduk,
-    total_laki_laki: d.total_lakilaki,
-    total_perempuan: d.total_perempuan,
-    total_disabilitas: d.total_disabilitas,
-    total_kk: 0,
-    ktp_wajib: d.ktp_wajib,
-    ktp_terpenuhi: d.ktp_terpenuhi,
-    akta_terpenuhi: d.akta_terpenuhi,
-    aktanikah_terpenuhi: d.aktanikah_terpenuhi,
-    last_update: new Date().toISOString(),
-    chart: data.chart,
-  };
+  });
 }
 
 /** Ambil statistik per desa dari API (loop semua desa) */
@@ -471,7 +531,7 @@ async function fetchDesaStatistik(
   const url = `${website}/internal_api/statistik/${statistikId}`;
   const res = await fetch(url, {
     next: { revalidate: 300 }, // cache 5 menit
-    signal: AbortSignal.timeout(10000),
+    signal: AbortSignal.timeout(2500),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const json: OpenSidStatistikResponse = await res.json();
@@ -543,8 +603,8 @@ function aggregateItems(
   return Array.from(map.values()).filter((i) => i.jumlah > 0).sort((a, b) => b.jumlah - a.jumlah);
 }
 
-/** Ambil statistik per desa langsung dari OpenSID tiap desa */
-export async function getStatistikPerDesaDirect(): Promise<DesaStatistikDirect[]> {
+/** Ambil statistik per desa langsung dari OpenSID tiap desa (Raw fetcher) */
+async function fetchStatistikPerDesaDirectRaw(): Promise<DesaStatistikDirect[]> {
   const results: DesaStatistikDirect[] = [];
 
   // Fetch jenis kelamin (id=4) dari semua desa secara paralel
@@ -649,8 +709,12 @@ export async function getStatistikPerDesaDirect(): Promise<DesaStatistikDirect[]
   return results;
 }
 
-/** Ambil statistik kecamatan dengan agregasi dari semua desa */
-export async function getStatistikKecamatanDirect(): Promise<StatistikKecamatanDirect> {
+export async function getStatistikPerDesaDirect(): Promise<DesaStatistikDirect[]> {
+  return getOrFetchCached<DesaStatistikDirect[]>('per_desa_direct', fetchStatistikPerDesaDirectRaw);
+}
+
+/** Ambil statistik kecamatan dengan agregasi dari semua desa (Raw fetcher) */
+async function fetchStatistikKecamatanDirectRaw(): Promise<StatistikKecamatanDirect> {
   // Fetch semua kategori dari semua desa secara paralel
   const categories = [
     'AGAMA',
@@ -719,6 +783,10 @@ export async function getStatistikKecamatanDirect(): Promise<StatistikKecamatanD
   };
 }
 
+export async function getStatistikKecamatanDirect(): Promise<StatistikKecamatanDirect> {
+  return getOrFetchCached<StatistikKecamatanDirect>('kecamatan_direct', fetchStatistikKecamatanDirectRaw);
+}
+
 // ─── Types untuk halaman statistik lainnya ───
 
 export type StatistikPendidikanDirect = {
@@ -783,7 +851,7 @@ export type StatistikProgramBantuanDirect = {
 
 // ─── Fungsi fetch statistik pendidikan ───
 
-export async function getStatistikPendidikanDirect(): Promise<StatistikPendidikanDirect> {
+async function fetchStatistikPendidikanDirectRaw(): Promise<StatistikPendidikanDirect> {
   const categories = ['PENDIDIKAN_KK', 'PENDIDIKAN_SEDANG'] as const;
 
   const allFetches: Promise<{ cat: string; desa: string; items: OpenSidStatistikItem[] } | null>[] = [];
@@ -820,9 +888,13 @@ export async function getStatistikPendidikanDirect(): Promise<StatistikPendidika
   };
 }
 
+export async function getStatistikPendidikanDirect(): Promise<StatistikPendidikanDirect> {
+  return getOrFetchCached<StatistikPendidikanDirect>('pendidikan_direct', fetchStatistikPendidikanDirectRaw);
+}
+
 // ─── Fungsi fetch statistik kesehatan ───
 
-export async function getStatistikKesehatanDirect(): Promise<StatistikKesehatanDirect> {
+async function fetchStatistikKesehatanDirectRaw(): Promise<StatistikKesehatanDirect> {
   const categories = ['CACAT', 'PENYAKIT', 'GOL_DARAH'] as const;
 
   const allFetches: Promise<{ cat: string; desa: string; items: OpenSidStatistikItem[] } | null>[] = [];
@@ -851,8 +923,7 @@ export async function getStatistikKesehatanDirect(): Promise<StatistikKesehatanD
   const getAgg = (cat: string) => {
     // Buang baris "bukan kondisi": TIDAK CACAT / TIDAK DISABILITAS (cacat),
     // TIDAK ADA/TIDAK SAKIT (penyakit), TIDAK TAHU (gol. darah) — baris-baris
-    // ini berisi warga SEHAT dan menggelembungkan total (mis. cacat jadi 4460
-    // padahal penyandangnya hanya puluhan).
+    // ini berisi warga SEHAT dan menggelembungkan total.
     const rows = (byCategory.get(cat) ?? []).map((items) =>
       items.filter((i) => !/^TIDAK/i.test((i.attributes.nama ?? '').trim())),
     );
@@ -869,6 +940,10 @@ export async function getStatistikKesehatanDirect(): Promise<StatistikKesehatanD
   };
 }
 
+export async function getStatistikKesehatanDirect(): Promise<StatistikKesehatanDirect> {
+  return getOrFetchCached<StatistikKesehatanDirect>('kesehatan_direct', fetchStatistikKesehatanDirectRaw);
+}
+
 // ─── Fungsi fetch program & bantuan (suplemen) ───
 
 async function fetchDesaSuplemen(website: string): Promise<SuplemenItem[]> {
@@ -880,7 +955,7 @@ async function fetchDesaSuplemen(website: string): Promise<SuplemenItem[]> {
     const url = `${website}/internal_api/suplemen?page[number]=${page}&page[size]=100`;
     const res = await fetch(url, {
       next: { revalidate: 300 },
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(2500),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json: SuplemenResponse = await res.json();
@@ -894,7 +969,7 @@ async function fetchDesaSuplemen(website: string): Promise<SuplemenItem[]> {
   return allItems;
 }
 
-export async function getProgramBantuanDirect(): Promise<StatistikProgramBantuanDirect> {
+async function fetchProgramBantuanDirectRaw(): Promise<StatistikProgramBantuanDirect> {
   const fetches = DESA_BANJARMANGU.map(async (desa) => {
     try {
       const programs = await fetchDesaSuplemen(desa.website);
@@ -957,4 +1032,8 @@ export async function getProgramBantuanDirect(): Promise<StatistikProgramBantuan
     per_desa: settled,
     aggregated,
   };
+}
+
+export async function getProgramBantuanDirect(): Promise<StatistikProgramBantuanDirect> {
+  return getOrFetchCached<StatistikProgramBantuanDirect>('program_bantuan_direct', fetchProgramBantuanDirectRaw);
 }

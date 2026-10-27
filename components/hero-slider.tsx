@@ -31,7 +31,7 @@ export function HeroSlider({ slides }: { slides: HeroSlide[] }) {
 
   if (slides.length === 0) {
     return (
-      <div className="relative h-[280px] sm:h-[360px] lg:h-[420px] bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-foreground)]" />
+      <div className="relative h-[300px] sm:h-[350px] lg:h-[380px] xl:h-[400px] bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-foreground)]" />
     );
   }
 
@@ -41,7 +41,7 @@ export function HeroSlider({ slides }: { slides: HeroSlide[] }) {
     <div
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
-      className="relative h-[280px] sm:h-[360px] lg:h-[420px] overflow-hidden bg-[var(--color-foreground)] group"
+      className="relative h-[300px] sm:h-[350px] lg:h-[380px] xl:h-[400px] overflow-hidden bg-[var(--color-foreground)] group"
     >
       {slides.map((s, i) => (
         <div
@@ -65,24 +65,24 @@ export function HeroSlider({ slides }: { slides: HeroSlide[] }) {
           {/* dark overlay for text readability */}
           <div className="absolute inset-0 bg-black/55" />
 
-          <div className="relative z-10 h-full mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col">
+          <div className="relative z-10 h-full mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col justify-between py-5 sm:py-7">
             {/* Label kecamatan / desa selalu terlihat di bagian atas */}
-            <div className="pt-6 sm:pt-8">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 text-[11px] font-bold uppercase tracking-widest text-white !text-white">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 text-[10px] sm:text-[11px] font-bold uppercase tracking-widest text-white !text-white">
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--color-accent)] animate-pulse-soft" />
                 {s.desaName ? `Desa ${s.desaName} · Kec. Banjarmangu` : "Kecamatan Banjarmangu"}
               </div>
             </div>
 
             {/* Judul artikel dengan ellipsis untuk teks panjang */}
-            <div className="flex-1 flex items-center mb-4 sm:mb-6">
-              <h1 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold leading-tight tracking-tight text-white !text-white line-clamp-3 max-w-3xl drop-shadow-sm">
+            <div className="my-auto py-2">
+              <h1 className="font-serif text-xl sm:text-3xl lg:text-4xl xl:text-5xl font-bold leading-tight tracking-tight text-white !text-white line-clamp-3 max-w-3xl drop-shadow-sm">
                 {s.title}
               </h1>
             </div>
 
             {/* Subtitle dan CTA dengan jarak dari batas bawah */}
-            <div className="animate-fade-up pb-5 sm:pb-7">
+            <div className="animate-fade-up">
               {s.subtitle && (
                 <p className="mt-2 text-sm sm:text-base text-white/90 line-clamp-2 max-w-2xl drop-shadow-sm">
                   {s.subtitle}
