@@ -30,7 +30,7 @@ app/page.tsx (Beranda)
  │    └── lib/db.ts
  ├── components/hero-slider.tsx
  ├── components/peta-banjarmangu-wrapper.tsx
- │    └── components/peta-banjarmangu.tsx (Leaflet)
+ │    └── components/peta-banjarmangu.tsx (MapLibre GL JS + GeoJSON 17 Desa)
  └── components/article-card.tsx
 
 app/admin/page.tsx (Admin Dashboard)

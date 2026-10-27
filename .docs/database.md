@@ -271,3 +271,11 @@ CREATE TABLE statistik_snapshot (
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 ```
+
+---
+
+## 3. Seed Data & Master Records
+
+1. **17 Desa Terdaftar:** `banjarmangu`, `banjarkulon`, `beji`, `gripit`, `jenggawur`, `kalilunjar`, `kendaga`, `kesenet`, `majatengah`, `paseh`, `pekandangan`, `prendengan`, `rejasari`, `sigeblog`, `sijenggung`, `sijeruk`, `sipedang`.
+2. **17 Kepala Desa (`perangkat_desa`):** Seluruh pimpinan 17 desa telah terdata dengan jabatan `Kepala Desa` untuk visualisasi peta geografis dan profil pemerintahan desa.
+3. **Akun Administrator Default (`admin_user`):** 1 user default aktif terlindungi dengan SHA-256 + salt session.

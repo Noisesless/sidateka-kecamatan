@@ -6,7 +6,7 @@
 graph TD
   subgraph Client [Client / Browser Layer]
     Web[Next.js Frontend / PWA]
-    Leaflet[Interactive Maps Leaflet]
+    MapLibre[Peta 2D MapLibre GL JS + OpenFreeMap + Esri Satellite]
     AdminUI[Admin Management Panel]
   end
 
@@ -61,7 +61,7 @@ graph TD
 
 ### A. Presentation Layer (`app/*`, `components/*`)
 - **Server Components (RSC):** Merender halaman secara instan di server dengan direct DB query untuk kecepatan LCP optimal.
-- **Client Components (`"use client"`):** Terisolasi untuk komponen interaktif seperti slider, peta Leaflet (`peta-banjarmangu.tsx`), filter tabs, form pengaduan, dan modal.
+- **Client Components (`"use client"`):** Terisolasi untuk komponen interaktif seperti slider, peta MapLibre GL JS (`components/peta-banjarmangu.tsx`) dengan multi-basemap switcher (Liberty, Positron, Citra Satelit) dan tooltip interaktif Kepala Desa, filter tabs, form pengaduan, dan modal.
 - **Universal SafeImage (`components/safe-image.tsx`):** Komponen gambar terlindungi yang otomatis menangkap event `onError` dan mengganti sumber gambar yang rusak ke gambar kolase kegiatan desa (`/placeholder-artikel.jpg`).
 
 ### B. Business Logic & Sync Layer (`lib/*`, `app/api/*`)

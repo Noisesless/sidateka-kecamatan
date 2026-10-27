@@ -13,7 +13,7 @@
 | `/desa/[slug]` | `app/desa/[slug]/page.tsx` | Profil Desa & Perangkat | Public | STABLE |
 | `/desa/[slug]/analitik` | `app/desa/[slug]/analitik/page.tsx` | Analitik Demografi Desa | Public | STABLE |
 | `/profil` | `app/profil/page.tsx` | Profil & Sejarah Kecamatan | Public | STABLE |
-| `/profil/letak-geografis` | `app/profil/letak-geografis/page.tsx` | Letak Geografis Wilayah | Public | STABLE |
+| `/profil/letak-geografis` | `app/profil/letak-geografis/page.tsx` | Letak Geografis & Peta Interaktif 17 Desa (MapLibre GL JS, Switcher 3 Basemap, Hover Kades, Klik Navigasi) | Public | STABLE |
 | `/profil/struktur-pemerintahan` | `app/profil/struktur-pemerintahan/page.tsx` | Struktur Organisasi Kecamatan | Public | STABLE |
 | `/profil/visi-misi` | `app/profil/visi-misi/page.tsx` | Visi & Misi Kecamatan | Public | STABLE |
 | `/profil/tupoksi` | `app/profil/tupoksi/page.tsx` | Tugas Pokok & Fungsi | Public | STABLE |

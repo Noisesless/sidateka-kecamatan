@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
 
-// Warna untuk desa-desa
+// Palet warna kontras harmonis untuk 17 desa
 const DESA_COLORS = [
   "#2563eb", "#dc2626", "#16a34a", "#ca8a04", "#9333ea",
   "#0891b2", "#db2777", "#65a30d", "#ea580c", "#4f46e5",
@@ -12,231 +13,476 @@ const DESA_COLORS = [
   "#0e7490", "#be185d",
 ];
 
+// Data Kepala Desa 17 Desa di Kecamatan Banjarmangu
+const KEPALA_DESA: Record<string, string> = {
+  banjarmangu: "Nurul Hilal Eko Prayitno, S.IP.",
+  banjarkulon: "Hudi",
+  beji: "Nyana",
+  gripit: "Sugeng (Pj.)",
+  jenggawur: "Pranyoto",
+  kalilunjar: "Slamet Rahardjo",
+  kendaga: "Murtinah",
+  kesenet: "Didin",
+  majatengah: "Sarno",
+  paseh: "Waris Mustofa",
+  pekandangan: "Adhi Setiawan, S.Pd.",
+  prendengan: "Muhamad Barokah",
+  rejasari: "Siti Nurfaizah, S.Pd.AUD",
+  sigeblog: "Akhmad Subandi",
+  sijenggung: "Suyono",
+  sijeruk: "Ramel",
+  sipedang: "Subagyo",
+};
+
+type StyleKey = "liberty" | "positron" | "satelit";
+
+interface SatelliteStyleSource {
+  type: "raster";
+  tiles: string[];
+  tileSize: number;
+  maxzoom: number;
+}
+
+interface SatelliteStyleLayer {
+  id: string;
+  type: "raster";
+  source: string;
+}
+
+interface SatelliteStyle {
+  version: 8;
+  sources: {
+    "esri-satellite": SatelliteStyleSource;
+  };
+  layers: SatelliteStyleLayer[];
+}
+
+const STYLES: Record<StyleKey, string | SatelliteStyle> = {
+  liberty: "https://tiles.openfreemap.org/styles/liberty",
+  positron: "https://tiles.openfreemap.org/styles/positron",
+  satelit: {
+    version: 8,
+    sources: {
+      "esri-satellite": {
+        type: "raster",
+        tiles: [
+          "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        ],
+        tileSize: 256,
+        maxzoom: 19,
+      },
+    },
+    layers: [
+      {
+        id: "esri-satellite-layer",
+        type: "raster",
+        source: "esri-satellite",
+      },
+    ],
+  },
+};
+
+function getStyleConfig(key: StyleKey): string | maplibregl.StyleSpecification {
+  if (key === "satelit") {
+    return {
+      version: 8,
+      sources: {
+        "esri-satellite": {
+          type: "raster",
+          tiles: [
+            "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+          ],
+          tileSize: 256,
+          maxzoom: 19,
+        },
+      },
+      layers: [
+        {
+          id: "esri-satellite-layer",
+          type: "raster",
+          source: "esri-satellite",
+        },
+      ],
+    } as unknown as maplibregl.StyleSpecification;
+  }
+  return STYLES[key] as string;
+}
+
+interface GeoFeature {
+  type: string;
+  geometry: {
+    type: string;
+    coordinates: unknown;
+  };
+  properties?: Record<string, unknown>;
+}
+
+function calculateBounds(features: GeoFeature[]): [[number, number], [number, number]] | null {
+  let minLng = Infinity;
+  let minLat = Infinity;
+  let maxLng = -Infinity;
+  let maxLat = -Infinity;
+
+  const traverse = (coords: unknown): void => {
+    if (!Array.isArray(coords)) return;
+    if (typeof coords[0] === "number" && typeof coords[1] === "number") {
+      const lng = coords[0];
+      const lat = coords[1];
+      if (lng < minLng) minLng = lng;
+      if (lng > maxLng) maxLng = lng;
+      if (lat < minLat) minLat = lat;
+      if (lat > maxLat) maxLat = lat;
+    } else {
+      for (const item of coords) {
+        traverse(item);
+      }
+    }
+  };
+
+  for (const feature of features) {
+    if (feature.geometry?.coordinates) {
+      traverse(feature.geometry.coordinates);
+    }
+  }
+
+  if (isFinite(minLng) && isFinite(minLat) && isFinite(maxLng) && isFinite(maxLat)) {
+    return [
+      [minLng, minLat],
+      [maxLng, maxLat],
+    ];
+  }
+  return null;
+}
+
 export default function PetaBanjarmangu() {
-  const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<L.Map | null>(null);
+  const router = useRouter();
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<maplibregl.Map | null>(null);
+  const [activeStyle, setActiveStyle] = useState<StyleKey>("liberty");
+
+  const dataRef = useRef<{
+    kec: GeoJSON.FeatureCollection;
+    desa: GeoJSON.FeatureCollection;
+    bounds: [[number, number], [number, number]] | null;
+  } | null>(null);
+
+  const fittedRef = useRef(false);
 
   useEffect(() => {
-    if (!mapRef.current || mapInstanceRef.current) return;
+    if (!mapContainerRef.current || mapInstanceRef.current) return;
 
-    let removed = false;
+    let isDisposed = false;
 
-    // Inisialisasi peta
-    const map = L.map(mapRef.current, {
-      center: [-7.339, 109.685],
-      zoom: 13,
-      scrollWheelZoom: false,
+    // Inisialisasi peta MapLibre GL
+    const map = new maplibregl.Map({
+      container: mapContainerRef.current,
+      style: STYLES.liberty,
+      center: [109.685, -7.339],
+      zoom: 12.5,
+      scrollZoom: false,
+      attributionControl: false,
     });
+
     mapInstanceRef.current = map;
 
-    // Base Map Layers (Sama persis seperti SIMAK Sistemdata)
-    const osmLayer = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "&copy; OpenStreetMap kontributor",
-      maxZoom: 19,
-      referrerPolicy: "no-referrer",
-    }).addTo(map);
+    // Kontrol navigasi (zoom in, zoom out, reset orientasi)
+    map.addControl(new maplibregl.NavigationControl({ showCompass: true }), "top-left");
 
-    const esriLayer = L.tileLayer(
-      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
-      {
-        attribution: "Tiles &copy; Esri",
-        maxZoom: 19,
-      },
-    );
+    // Popup interaktif saat kursor melayang di wilayah desa
+    const popup = new maplibregl.Popup({
+      closeButton: false,
+      closeOnClick: false,
+      className: "desa-maplibre-popup",
+    });
 
-    const satelitLayer = L.tileLayer(
-      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-      {
-        attribution:
-          "Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics",
-        maxZoom: 18,
-      },
-    );
+    const renderGeoJson = () => {
+      const data = dataRef.current;
+      if (!data || !map) return;
 
-    L.control
-      .layers(
-        {
-          "Peta Standar (OSM)": osmLayer,
-          "Esri Street Map": esriLayer,
-          "Citra Satelit": satelitLayer,
-        },
-        {},
-        { position: "topright" },
-      )
-      .addTo(map);
+      // Jika layer desa sudah terpasang di style saat ini, lewati
+      if (map.getSource("desa-source")) return;
 
-    // Load GeoJSON
+      try {
+        // 1. Tambahkan Layer Batas Kecamatan Banjarmangu
+        if (!map.getSource("kecamatan-source")) {
+          map.addSource("kecamatan-source", {
+            type: "geojson",
+            data: data.kec,
+          });
+
+          map.addLayer({
+            id: "kecamatan-fill-layer",
+            type: "fill",
+            source: "kecamatan-source",
+            paint: {
+              "fill-color": "#3b82f6",
+              "fill-opacity": 0.04,
+            },
+          });
+
+          map.addLayer({
+            id: "kecamatan-line-layer",
+            type: "line",
+            source: "kecamatan-source",
+            paint: {
+              "line-color": "#1e40af",
+              "line-width": 2.5,
+              "line-dasharray": [3, 2],
+            },
+          });
+        }
+
+        // 2. Tambahkan Layer 17 Wilayah Desa
+        map.addSource("desa-source", {
+          type: "geojson",
+          data: data.desa,
+        });
+
+        map.addLayer({
+          id: "desa-fill-layer",
+          type: "fill",
+          source: "desa-source",
+          paint: {
+            "fill-color": ["get", "color"],
+            "fill-opacity": 0.58,
+          },
+        });
+
+        map.addLayer({
+          id: "desa-line-layer",
+          type: "line",
+          source: "desa-source",
+          paint: {
+            "line-color": "#ffffff",
+            "line-width": 1.5,
+          },
+        });
+
+        // Fit bounds kamera ke seluruh wilayah kecamatan & desa
+        if (!fittedRef.current && data.bounds) {
+          fittedRef.current = true;
+          map.fitBounds(data.bounds, { padding: 35, duration: 800 });
+        }
+      } catch {
+        // Abaikan jika style belum siap di tick ini, styledata berikutnya akan memicu kembali
+      }
+    };
+
+    // Event listener styledata: selalu terpanggil setiap style baru dimuat atau diubah
+    map.on("styledata", () => {
+      renderGeoJson();
+    });
+
+    map.on("load", () => {
+      renderGeoJson();
+    });
+
+    // Interaktivitas hover popup desa: menampilkan Nama Desa & Kepala Desa
+    map.on("mousemove", "desa-fill-layer", (e) => {
+      map.getCanvas().style.cursor = "pointer";
+      const feature = e.features?.[0];
+      if (!feature) return;
+
+      const rawName = (feature.properties?.Nama_Desa_ || "") as string;
+      const cleanName = rawName.replace(/^Desa\s+/i, "").replace(/^Kel\.\s+/i, "");
+      const slug = cleanName.toLowerCase().trim();
+      const kades = KEPALA_DESA[slug] || "";
+
+      popup
+        .setLngLat(e.lngLat)
+        .setHTML(`
+          <div style="font-family:var(--font-serif);font-size:15px;font-weight:700;color:#1e3a8a;margin-bottom:3px;letter-spacing:-0.01em;">
+            ${rawName || `Desa ${cleanName}`}
+          </div>
+          ${
+            kades
+              ? `
+            <div style="display:flex;align-items:center;gap:6px;margin:4px 0 5px 0;padding:3px 7px;border-radius:6px;background:#f0fdf4;border:1px solid #bbf7d0;">
+              <span style="font-size:10px;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:0.02em;">Kepala Desa:</span>
+              <span style="font-size:11.5px;font-weight:600;color:#14532d;">${kades}</span>
+            </div>`
+              : ""
+          }
+          <div style="font-family:var(--font-sans);font-size:11px;color:#64748b;line-height:1.3;">
+            Kecamatan Banjarmangu · Banjarnegara
+          </div>
+          <div style="margin-top:4px;font-size:10.5px;color:#2563eb;font-weight:600;">
+            Klik untuk profil desa →
+          </div>
+        `)
+        .addTo(map);
+    });
+
+    map.on("mouseleave", "desa-fill-layer", () => {
+      map.getCanvas().style.cursor = "";
+      popup.remove();
+    });
+
+    // Navigasi ke halaman detail desa saat wilayah desa diklik
+    map.on("click", "desa-fill-layer", (e) => {
+      const feature = e.features?.[0];
+      if (!feature) return;
+      const rawName = (feature.properties?.Nama_Desa_ || "") as string;
+      const cleanName = rawName.replace(/^Desa\s+/i, "").replace(/^Kel\.\s+/i, "");
+      const slug = cleanName.toLowerCase().trim();
+      if (slug) {
+        router.push(`/desa/${slug}`);
+      }
+    });
+
+    // Ambil GeoJSON secara paralel
     Promise.all([
       fetch("/peta_kecamatan.geojson").then((r) => r.json()),
       fetch("/peta_desa.geojson").then((r) => r.json()),
-    ]).then(([kecData, desaData]) => {
-      if (removed || !mapInstanceRef.current) return;
+    ])
+      .then(([kecData, desaData]) => {
+        if (isDisposed || !mapInstanceRef.current) return;
 
-      // Filter kecamatan Banjarmangu
-      const kecLayer = L.geoJSON(kecData, {
-        filter: (feature) =>
-          (feature.properties.Kecamatan || "").toLowerCase() === "banjarmangu",
-        style: {
-          color: "#1e40af",
-          weight: 3,
-          fillColor: "#3b82f6",
-          fillOpacity: 0.05,
-          dashArray: "8 4",
-        },
-      }).addTo(map);
+        // Filter batas kecamatan Banjarmangu
+        const filteredKec: GeoJSON.FeatureCollection = {
+          type: "FeatureCollection",
+          features: (kecData.features || []).filter((f: GeoFeature) => {
+            const kec = String(f.properties?.Kecamatan || "");
+            return kec.toLowerCase() === "banjarmangu";
+          }),
+        };
 
-      // Filter desa di Kec. Banjarmangu
-      let colorIdx = 0;
-      const desaLayer = L.geoJSON(desaData, {
-        filter: (feature) =>
-          (feature.properties.Kecamatan || "").toLowerCase().includes("banjarmangu"),
-        style: () => {
-          const color = DESA_COLORS[colorIdx % DESA_COLORS.length];
-          colorIdx++;
-          return {
-            color: "#fff",
-            weight: 1.5,
-            fillColor: color,
-            fillOpacity: 0.55,
-          };
-        },
-        onEachFeature: (feature, layer) => {
-          const nama = (feature.properties.Nama_Desa_ || "").replace(/^Desa\s+/i, "").replace(/^Kel\.\s+/i, "");
-          layer.bindTooltip(nama, {
-            permanent: false,
-            direction: "center",
-            className: "desa-label",
-          });
-          layer.bindPopup(`
-            <div style="font-family:var(--font-serif);font-size:15px;font-weight:700;color:#1e3a8a;margin-bottom:2px;letter-spacing:-0.01em;">
-              ${feature.properties.Nama_Desa_}
-            </div>
-            <div style="font-family:var(--font-sans);font-size:12px;color:#64748b;line-height:1.4;">
-              Kecamatan Banjarmangu<br/>Kabupaten Banjarnegara
-            </div>
-          `);
-        },
-      }).addTo(map);
+        // Filter 17 desa di kecamatan Banjarmangu
+        let colorIdx = 0;
+        const filteredDesa: GeoJSON.FeatureCollection = {
+          type: "FeatureCollection",
+          features: (desaData.features || [])
+            .filter((f: GeoFeature) => {
+              const kec = String(f.properties?.Kecamatan || "");
+              return kec.toLowerCase().includes("banjarmangu");
+            })
+            .map((f: GeoFeature) => {
+              const color = DESA_COLORS[colorIdx % DESA_COLORS.length];
+              colorIdx++;
+              return {
+                ...f,
+                properties: {
+                  ...f.properties,
+                  color,
+                },
+              };
+            }),
+        };
 
-      // Fit bounds ke gabungan kecamatan + desa
-      const bounds = kecLayer.getBounds();
-      bounds.extend(desaLayer.getBounds());
-      map.fitBounds(bounds, { padding: [30, 30] });
+        const allFeatures = [
+          ...(filteredKec.features as GeoFeature[]),
+          ...(filteredDesa.features as GeoFeature[]),
+        ];
+        const bounds = calculateBounds(allFeatures);
 
-      // Legenda
-      const legend = (L.control as any)({ position: "bottomright" });
-      legend.onAdd = () => {
-        const div = L.DomUtil.create("div", "peta-legend");
-        div.innerHTML = `
-          <div style="background:rgba(255,255,255,0.96);backdrop-filter:blur(8px);padding:10px 14px;border-radius:10px;border:1px solid #bfdbfe;box-shadow:0 4px 12px rgba(0,0,0,0.08);font-family:var(--font-sans);">
-            <div style="font-family:var(--font-serif);font-size:13px;font-weight:700;color:#1e3a8a;margin-bottom:6px;letter-spacing:-0.01em;">
-              Kec. Banjarmangu
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;font-size:11px;color:#334155;font-weight:500;">
-              <span style="display:inline-block;width:16px;height:12px;border:2px dashed #1e40af;background:rgba(59,130,246,.08);border-radius:2px;"></span>
-              <span>Batas Kecamatan</span>
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:#334155;font-weight:500;">
-              <span style="display:inline-block;width:16px;height:12px;background:#2563eb;border:1px solid #fff;border-radius:2px;opacity:.65;"></span>
-              <span>Wilayah Desa</span>
-            </div>
-          </div>
-        `;
-        return div;
-      };
-      legend.addTo(map);
-    });
+        dataRef.current = {
+          kec: filteredKec,
+          desa: filteredDesa,
+          bounds,
+        };
+
+        if (map.isStyleLoaded()) {
+          renderGeoJson();
+        }
+      })
+      .catch((err) => {
+        console.error("Gagal memuat GeoJSON:", err);
+      });
 
     return () => {
-      removed = true;
+      isDisposed = true;
+      popup.remove();
       map.remove();
       mapInstanceRef.current = null;
     };
-  }, []);
+  }, [router]);
+
+  const switchStyle = (styleKey: StyleKey) => {
+    setActiveStyle(styleKey);
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    map.setStyle(getStyleConfig(styleKey));
+  };
 
   return (
-    <>
+    <div className="relative w-full rounded-xl border border-[var(--color-border)] overflow-hidden shadow-sm">
+      {/* Switcher Layer Peta Elegan */}
+      <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5 p-1 rounded-lg bg-white/95 backdrop-blur-md border border-blue-200 shadow-md">
+        <button
+          type="button"
+          onClick={() => switchStyle("liberty")}
+          className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
+            activeStyle === "liberty"
+              ? "bg-[#1e40af] text-white shadow-sm"
+              : "text-slate-600 hover:text-blue-900 hover:bg-blue-50"
+          }`}
+        >
+          Elegan (Liberty)
+        </button>
+        <button
+          type="button"
+          onClick={() => switchStyle("positron")}
+          className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
+            activeStyle === "positron"
+              ? "bg-[#1e40af] text-white shadow-sm"
+              : "text-slate-600 hover:text-blue-900 hover:bg-blue-50"
+          }`}
+        >
+          Terang (Positron)
+        </button>
+        <button
+          type="button"
+          onClick={() => switchStyle("satelit")}
+          className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
+            activeStyle === "satelit"
+              ? "bg-[#1e40af] text-white shadow-sm"
+              : "text-slate-600 hover:text-blue-900 hover:bg-blue-50"
+          }`}
+        >
+          Citra Satelit
+        </button>
+      </div>
+
+      {/* Map Canvas */}
       <div
-        ref={mapRef}
-        className="w-full h-[320px] sm:h-[420px] md:h-[500px] rounded-xl border border-[var(--color-border)] overflow-hidden"
+        ref={mapContainerRef}
+        className="w-full h-[340px] sm:h-[440px] md:h-[520px]"
       />
+
+      {/* Legenda Wilayah */}
+      <div className="absolute bottom-3 right-3 z-10 p-3 rounded-lg bg-white/95 backdrop-blur-md border border-blue-200 shadow-md font-sans">
+        <div className="font-serif text-xs font-bold text-[#1e3a8a] mb-1.5 tracking-tight">
+          Kec. Banjarmangu
+        </div>
+        <div className="flex items-center gap-2 mb-1 text-[11px] text-slate-700 font-medium">
+          <span className="inline-block w-4 h-3 border-2 border-dashed border-[#1e40af] bg-blue-500/10 rounded-sm" />
+          <span>Batas Kecamatan</span>
+        </div>
+        <div className="flex items-center gap-2 text-[11px] text-slate-700 font-medium">
+          <span className="inline-block w-4 h-3 bg-[#2563eb] border border-white rounded-sm opacity-70" />
+          <span>Wilayah Desa</span>
+        </div>
+      </div>
+
       <style>{`
-        /* Konsistensi Font Aplikasi pada Seluruh Elemen Leaflet */
-        .leaflet-container {
-          font-family: var(--font-sans), "Roboto", system-ui, -apple-system, sans-serif !important;
-        }
-        .leaflet-control {
-          font-family: var(--font-sans), "Roboto", system-ui, -apple-system, sans-serif !important;
-        }
-        .leaflet-control-layers {
-          font-family: var(--font-sans), "Roboto", system-ui, -apple-system, sans-serif !important;
-          font-size: 12px !important;
-          font-weight: 500 !important;
+        .desa-maplibre-popup .maplibregl-popup-content {
           border-radius: 10px !important;
           border: 1px solid #bfdbfe !important;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
-          background: rgba(255,255,255,0.96) !important;
+          box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12) !important;
+          padding: 8px 12px !important;
+          background: rgba(255, 255, 255, 0.98) !important;
           backdrop-filter: blur(8px) !important;
         }
-        .leaflet-control-layers-base label {
-          font-family: var(--font-sans), "Roboto", system-ui, -apple-system, sans-serif !important;
-          font-size: 12px !important;
-          color: #1e3a8a !important;
-          display: flex !important;
-          align-items: center !important;
-          gap: 6px !important;
-          padding: 2px 0 !important;
-          cursor: pointer !important;
+        .desa-maplibre-popup .maplibregl-popup-tip {
+          border-top-color: #bfdbfe !important;
         }
-        .leaflet-control-attribution {
-          font-family: var(--font-sans), "Roboto", system-ui, -apple-system, sans-serif !important;
-          font-size: 11px !important;
-          background: rgba(255,255,255,0.85) !important;
-          backdrop-filter: blur(4px) !important;
-          color: #64748b !important;
-        }
-        .leaflet-control-attribution a {
-          color: #1e40af !important;
-          font-weight: 500 !important;
-        }
-        .leaflet-control-zoom {
+        .maplibregl-ctrl-group {
           border-radius: 8px !important;
           overflow: hidden !important;
           border: 1px solid #bfdbfe !important;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important;
-        }
-        .leaflet-control-zoom a {
-          font-family: var(--font-sans), "Roboto", system-ui, -apple-system, sans-serif !important;
-          font-weight: 700 !important;
-          color: #1e3a8a !important;
-          background: rgba(255,255,255,0.95) !important;
-        }
-        .desa-label {
-          font-family: var(--font-sans), "Roboto", system-ui, -apple-system, sans-serif !important;
-          background: rgba(255,255,255,0.92) !important;
-          border: 1px solid #bfdbfe !important;
-          border-radius: 6px !important;
-          padding: 3px 8px !important;
-          font-size: 11px !important;
-          font-weight: 600 !important;
-          color: #1e3a8a !important;
-          box-shadow: 0 2px 6px rgba(0,0,0,0.1) !important;
-          white-space: nowrap !important;
-          backdrop-filter: blur(4px) !important;
-        }
-        .leaflet-popup-content-wrapper {
-          border-radius: 12px !important;
-          border: 1px solid #bfdbfe !important;
-          box-shadow: 0 6px 20px rgba(0,0,0,0.12) !important;
-          font-family: var(--font-sans), "Roboto", system-ui, -apple-system, sans-serif !important;
-        }
-        .leaflet-popup-content {
-          font-family: var(--font-sans), "Roboto", system-ui, -apple-system, sans-serif !important;
-          font-size: 12px !important;
-          line-height: 1.5 !important;
-          margin: 12px 14px !important;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
         }
       `}</style>
-    </>
+    </div>
   );
 }
