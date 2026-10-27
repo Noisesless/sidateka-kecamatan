@@ -5,6 +5,11 @@ import { useRouter } from "next/navigation";
 import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 
+// Set web worker eksplisit agar vector tiles decoding (Liberty & Positron) serta GeoJSON parsing berjalan lancar
+if (typeof window !== "undefined") {
+  maplibregl.setWorkerUrl("/maplibre-gl-worker.mjs");
+}
+
 // Palet warna kontras harmonis untuk 17 desa
 const DESA_COLORS = [
   "#2563eb", "#dc2626", "#16a34a", "#ca8a04", "#9333ea",
@@ -174,6 +179,7 @@ export default function PetaBanjarmangu() {
     let isDisposed = false;
 
     // Inisialisasi peta MapLibre GL
+    maplibregl.setWorkerUrl("/maplibre-gl-worker.mjs");
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
       style: STYLES.liberty,

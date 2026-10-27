@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "postinstall": "node -e \"const fs=require('fs'); if(fs.existsSync('node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs')) fs.copyFileSync('node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs', 'public/maplibre-gl-worker.mjs');\""
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4",
