@@ -11,9 +11,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 const USER_AGENT =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-  "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 " +
-  "(PortalKecamatanBanjarmangu/1.0)";
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
 function decodeEntities(s: string | null): string {
   if (!s) return "";
@@ -58,8 +56,8 @@ async function fetchArticleContent(
     const res = await fetch(url, {
       headers: {
         "User-Agent": USER_AGENT,
-        Accept: "text/html,application/xhtml+xml",
-        "Accept-Language": "id,en;q=0.9",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
       },
       signal: controller.signal,
     });
@@ -85,10 +83,10 @@ async function fetchArticleContent(
     // OpenSID default uses Indonesian spelling (.artikel-content),
     // OpenSID Esensi/Natra theme (desa.id) uses .content-isi inside #printing
     const contentSelectors = [
-      ".content.space-y-2",
-      "div.content",
       ".artikelpage .isicontent",
       ".isicontent",
+      ".content.space-y-2",
+      "div.content",
       ".content-isi",
       "#printing .content-area",
       ".article-content",
@@ -188,7 +186,7 @@ export default async function ArtikelDetailPage({
   // excerpt RSS (feed OpenSID memotong isi artikel dengan akhiran "[...]").
   let ringkasan = a.ringkasan;
   let konten = a.konten;
-  const kontenHanyaExcerpt = !konten || stripHtml(konten).endsWith("[...]");
+  const kontenHanyaExcerpt = !konten || stripHtml(konten).endsWith("[...]") || stripHtml(konten).length < 500;
   if (kontenHanyaExcerpt && a.url) {
     const fetched = await fetchArticleContent(a.url);
     if (fetched) {

@@ -130,12 +130,26 @@ export default async function DesaDetailPage({
                   Artikel
                 </div>
               </div>
-              <div className={`rounded-xl px-4 py-3 border ${statusColor}`}>
-                <div className="text-[10px] uppercase tracking-widest font-bold mb-1">
-                  {statusLabel}
+              <a
+                href={desa.website}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-xl bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20 px-4 py-3 text-white transition-colors"
+              >
+                <div>
+                  <div className="text-xs font-bold uppercase tracking-wider text-white flex items-center gap-1.5">
+                    Situs Resmi
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                      <polyline points="15 3 21 3 21 9" />
+                      <line x1="10" y1="14" x2="21" y2="3" />
+                    </svg>
+                  </div>
+                  <div className="text-xs text-white/80 font-mono mt-0.5">
+                    {new URL(desa.website).hostname}
+                  </div>
                 </div>
-                <div className="text-xs font-mono">{formatDate(desa.last_sync_at)}</div>
-              </div>
+              </a>
             </div>
           </div>
         </div>
@@ -143,12 +157,7 @@ export default async function DesaDetailPage({
 
       {/* Content */}
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
-        {desa.last_sync_message && (
-          <div className="mb-6 rounded-lg border border-[var(--color-border)] bg-white p-4 text-xs text-[var(--color-muted-foreground)] font-mono">
-            <span className="font-bold text-[var(--color-foreground)]">Catatan sinkron:</span>{" "}
-            {desa.last_sync_message}
-          </div>
-        )}
+        
 
         <DesaPerangkatSection perangkat={perangkatItems} />
 

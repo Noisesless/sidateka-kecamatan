@@ -11,9 +11,7 @@ const UPLOAD_DIR =
   process.env.UPLOAD_DIR || path.join(process.cwd(), '.data', 'uploads');
 
 const USER_AGENT =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
-  '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 ' +
-  '(PortalKecamatanBanjarmangu/1.0)';
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
 const FETCH_TIMEOUT = 60_000; // 60 detik (default)
 const RSS_TIMEOUT = 120_000; // 120 detik
@@ -1125,6 +1123,46 @@ export function detectAparatur(html: string, pageUrl: string): AparaturEntry[] {
       norm($el.find('h3').first().nextAll('p').first().text()) || norm($el.find('p').first().text());
     push(nama, jabatan, validFoto(src));
   });
+
+  // Pola D — Tema Natra / Esensi OpenSID (seperti Sijenggung): .staf-nama
+  $('.staf-nama').each((_i, el) => {
+    const $el = $(el);
+    const $img = $el.parent().find('img').first();
+    const src = $img.attr('src') || '';
+    const jabatan = norm($el.find('h3').first().text());
+    const nama = norm($el.find('p').first().text()) || norm($img.attr('alt') || '');
+    if (nama && jabatan) {
+      push(nama, jabatan, validFoto(src));
+    }
+  });
+
+  // Pola E — Tema OpenDesa / Tailwind (seperti Paseh): img user_pict / pamong
+  $('img[src*="user_pict"], img[src*="pamong"]').each((_i, el) => {
+    const $img = $(el);
+    const src = $img.attr('src') || '';
+    const parent = $img.closest('div, li');
+    const text = parent.text().replace(/\s+/g, ' ').trim();
+    const alt = $img.attr('alt') || '';
+    const posRegex = /(Kepala Desa|Sekretaris(?:\s+Desa)?|Kepala Seksi [A-Za-z]+|Kepala Urusan [A-Za-z-]+|Kepala Dusun [IVX0-9]+|Kasi [A-Za-z]+|Kaur [A-Za-z]+|Kadus [IVX0-9]+)/i;
+    const match = text.match(posRegex);
+    if (match) {
+      const jabatan = match[0].trim();
+      const nama = alt || text.replace(match[0], '').trim();
+      push(nama, jabatan, validFoto(src));
+    }
+  });
+
+  // Pola F — Teks SOTK struktur nomor (seperti Prendengan)
+  const allText = $.text().replace(/\s+/g, ' ');
+  const listRegex = /(\d+)[\.\)]\s*([A-Za-z\s\d]+?)\s*:\s*([A-Za-z\s.,]+?)(?=\s*\d+[\.\)]|$)/g;
+  let m;
+  while ((m = listRegex.exec(allText)) !== null) {
+    const jabatan = norm(m[2]);
+    const nama = norm(m[3]);
+    if (/Kepala|Sekretaris|Kaur|Kasi|Kadus|Bendahara|Staf/i.test(jabatan) && jabatan.length < 50 && nama.length > 2 && nama.length < 80) {
+      push(nama, jabatan, null);
+    }
+  }
 
   return out.slice(0, 40);
 }
