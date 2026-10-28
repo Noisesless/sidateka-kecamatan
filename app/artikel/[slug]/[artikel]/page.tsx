@@ -116,15 +116,25 @@ export default async function ArtikelDetailPage({
     cleanKonten = $clean("body").html()?.trim() || "";
   }
 
-  const strippedKonten = cleanKonten ? stripHtml(cleanKonten) : "";
-  const strippedRingkasan = cleanRingkasan ? stripHtml(cleanRingkasan) : "";
+  // Bersihkan tanda [...] kutipan cuplikan agar teks mengalir natural
+  if (cleanKonten) {
+    cleanKonten = cleanKonten
+      .replace(/\[\.\.\.\]/g, "")
+      .replace(/\.{3,}<\/p>/gi, ".</p>")
+      .trim();
+  }
 
-  // Cek apakah konten hanya berupa ringkasan pendek / kutipan cuplikan RSS
-  const isExcerptOnly =
-    !cleanKonten ||
-    strippedKonten.endsWith("[...]") ||
-    strippedKonten.length <= 320 ||
-    strippedKonten.replace(/\s+/g, "") === strippedRingkasan.replace(/\s+/g, "");
+  const displayRingkasanClean = cleanRingkasan
+    ? cleanRingkasan.replace(/\[\.\.\.\]/g, "").replace(/\.{3,}$/, "").trim()
+    : "";
+
+  // Tentukan konten yang akan dirender: utamakan HTML konten, fallback ke ringkasan berformat paragraf
+  let displayHtml = cleanKonten;
+  if (!displayHtml && displayRingkasanClean) {
+    displayHtml = `<p>${displayRingkasanClean}</p>`;
+  }
+
+  const isExcerptOnly = !cleanKonten || (!cleanKonten.includes('<p') && cleanKonten.length < 500);
 
   // Related: same desa
   const related = getRecentArtikel(4, slug).filter((x) => x.id !== a.id).slice(0, 3);
@@ -203,44 +213,22 @@ export default async function ArtikelDetailPage({
         </div>
       )}
 
-      {/* Content - konten artikel / ringkasan resmi tanpa duplikasi */}
+      {/* Content - konten artikel resmi berformat penuh */}
       <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
-        {/* Jika artikel memiliki konten utuh (bukan sekadar ringkasan pendek) */}
-        {!isExcerptOnly && cleanKonten ? (
+        {displayHtml ? (
           <div className="mb-10 rounded-2xl border border-[var(--color-border)] bg-white p-6 sm:p-9 shadow-xs">
             <div
               className="prose-article text-[var(--color-foreground)] leading-relaxed text-base sm:text-lg"
-              dangerouslySetInnerHTML={{ __html: cleanKonten }}
+              dangerouslySetInnerHTML={{ __html: displayHtml }}
             />
           </div>
-        ) : null}
-
-        {/* Jika artikel hanya memiliki ringkasan / cuplikan RSS */}
-        {isExcerptOnly && (cleanRingkasan || strippedKonten) ? (
-          <div className="mb-8 rounded-2xl border border-[var(--color-border)] bg-[var(--color-muted)]/20 p-6 sm:p-8">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--color-primary)] mb-3 flex items-center gap-2">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="21" y1="10" x2="3" y2="10" />
-                <line x1="21" y1="6" x2="3" y2="6" />
-                <line x1="21" y1="14" x2="3" y2="14" />
-                <line x1="17" y1="18" x2="3" y2="18" />
-              </svg>
-              <span>Ringkasan Berita Resmi</span>
-            </div>
-            <p className="text-base sm:text-lg text-[var(--color-foreground)] leading-relaxed whitespace-pre-line font-serif">
-              {cleanRingkasan || strippedKonten}
-            </p>
-          </div>
-        ) : null}
-
-        {/* Pesan jika tidak ada konten sama sekali */}
-        {!cleanRingkasan && !cleanKonten ? (
+        ) : (
           <div className="mb-8 rounded-2xl border border-[var(--color-border)] bg-[var(--color-muted)]/40 p-6 text-center">
             <p className="text-sm text-[var(--color-muted-foreground)]">
-              Konten artikel belum tersedia. Silakan buka artikel asli untuk membaca konten lengkap.
+              Konten artikel belum tersedia. Silakan kunjungi tautan rujukan resmi di bawah untuk membaca langsung dari sumber desa.
             </p>
           </div>
-        ) : null}
+        )}
 
         {/* Share buttons */}
         <div className="mb-8 flex items-center gap-3 flex-wrap">

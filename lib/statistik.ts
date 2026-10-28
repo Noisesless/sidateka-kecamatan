@@ -603,8 +603,94 @@ function aggregateItems(
   return Array.from(map.values()).filter((i) => i.jumlah > 0).sort((a, b) => b.jumlah - a.jumlah);
 }
 
+/** Helper membaca agregasi kategori dari tabel lokal statistik_desa */
+function getCategoryAggFromDb(kategori: string, filterTidak = false): AggregatedStatItem[] {
+  try {
+    const rows = db.prepare(`
+      SELECT s.nama, SUM(s.jumlah) as jumlah, SUM(s.laki) as laki, SUM(s.perempuan) as perempuan
+      FROM statistik_desa s
+      WHERE s.kategori = ? AND s.nama NOT IN ('JUMLAH', 'TOTAL', 'BELUM MENGISI')
+      GROUP BY s.nama
+      HAVING SUM(s.jumlah) > 0
+      ORDER BY jumlah DESC
+    `).all(kategori) as Array<{ nama: string; jumlah: number; laki: number; perempuan: number }>;
+
+    let filtered = rows;
+    if (filterTidak) {
+      filtered = rows.filter((r) => !/^TIDAK/i.test((r.nama ?? '').trim()));
+    }
+
+    return filtered.map((r, idx) => ({
+      nama: r.nama,
+      jumlah: r.jumlah,
+      laki: r.laki,
+      perempuan: r.perempuan,
+      color: CHART_COLORS[idx % CHART_COLORS.length],
+    }));
+  } catch {
+    return [];
+  }
+}
+
 /** Ambil statistik per desa langsung dari OpenSID tiap desa (Raw fetcher) */
 async function fetchStatistikPerDesaDirectRaw(): Promise<DesaStatistikDirect[]> {
+  // Prioritas 1: Ambil langsung dari tabel lokal statistik_desa (hasil sync resmi)
+  try {
+    const allDesa = db.prepare('SELECT id, nama, slug, website FROM desa ORDER BY nama ASC').all() as Array<{
+      id: number;
+      nama: string;
+      slug: string;
+      website: string;
+    }>;
+
+    const statRows = db.prepare(`
+      SELECT 
+        s.desa_id,
+        SUM(s.jumlah) as penduduk,
+        SUM(s.laki) as laki,
+        SUM(s.perempuan) as perempuan
+      FROM statistik_desa s
+      WHERE s.kategori = 'jenis_kelamin' AND s.nama NOT IN ('JUMLAH', 'TOTAL', 'BELUM MENGISI')
+      GROUP BY s.desa_id
+    `).all() as Array<{ desa_id: number; penduduk: number; laki: number; perempuan: number }>;
+
+    if (statRows.length > 0) {
+      const statMap = new Map<number, { penduduk: number; laki: number; perempuan: number }>();
+      for (const r of statRows) {
+        statMap.set(r.desa_id, { penduduk: r.penduduk, laki: r.laki, perempuan: r.perempuan });
+      }
+
+      const results: DesaStatistikDirect[] = allDesa.map((d) => {
+        const s = statMap.get(d.id);
+        if (s && s.penduduk > 0) {
+          return {
+            desa_slug: d.slug,
+            desa_nama: d.nama,
+            website: d.website,
+            penduduk: s.penduduk,
+            laki_laki: s.laki,
+            perempuan: s.perempuan,
+            status: 'ok' as const,
+          };
+        }
+        return {
+          desa_slug: d.slug,
+          desa_nama: d.nama,
+          website: d.website,
+          penduduk: 0,
+          laki_laki: 0,
+          perempuan: 0,
+          status: 'empty' as const,
+        };
+      });
+
+      return results;
+    }
+  } catch (err) {
+    console.error('Gagal membaca statistik per-desa dari DB lokal, fallback ke fetch:', err);
+  }
+
+  // Fallback 2: Jika DB lokal belum tersinkronisasi, fallback ke network fetch
   const results: DesaStatistikDirect[] = [];
 
   // Fetch jenis kelamin (id=4) dari semua desa secara paralel
@@ -715,7 +801,39 @@ export async function getStatistikPerDesaDirect(): Promise<DesaStatistikDirect[]
 
 /** Ambil statistik kecamatan dengan agregasi dari semua desa (Raw fetcher) */
 async function fetchStatistikKecamatanDirectRaw(): Promise<StatistikKecamatanDirect> {
-  // Fetch semua kategori dari semua desa secara paralel
+  // Prioritas 1: Baca langsung dari DB lokal statistik_desa (hasil sync resmi)
+  try {
+    const totals = db.prepare(`
+      SELECT 
+        COUNT(DISTINCT s.desa_id) as desa_ok,
+        COALESCE(SUM(s.jumlah), 0) as total_penduduk,
+        COALESCE(SUM(s.laki), 0) as total_laki,
+        COALESCE(SUM(s.perempuan), 0) as total_perempuan
+      FROM statistik_desa s
+      WHERE s.kategori = 'jenis_kelamin' AND s.nama NOT IN ('JUMLAH', 'TOTAL', 'BELUM MENGISI')
+    `).get() as { desa_ok: number; total_penduduk: number; total_laki: number; total_perempuan: number } | undefined;
+
+    if (totals && totals.desa_ok > 0 && totals.total_penduduk > 0) {
+      const totalDesa = (db.prepare('SELECT COUNT(*) as c FROM desa').get() as { c: number } | undefined)?.c ?? DESA_BANJARMANGU.length;
+      return {
+        desa_count: totalDesa,
+        desa_ok: totals.desa_ok,
+        total_penduduk: totals.total_penduduk,
+        total_laki_laki: totals.total_laki,
+        total_perempuan: totals.total_perempuan,
+        agama: getCategoryAggFromDb('agama'),
+        usia: getCategoryAggFromDb('umur_kategori'),
+        gol_darah: getCategoryAggFromDb('golongan_darah'),
+        status_kawin: getCategoryAggFromDb('status_kawin'),
+        pendidikan: getCategoryAggFromDb('pendidikan_kk'),
+        pekerjaan: getCategoryAggFromDb('pekerjaan'),
+      };
+    }
+  } catch (err) {
+    console.error('Gagal agregasi kecamatan dari DB lokal, fallback ke fetch:', err);
+  }
+
+  // Fallback 2: Fetch paralel jika DB lokal belum tersinkronisasi
   const categories = [
     'AGAMA',
     'UMUR_KATEGORI',
@@ -852,6 +970,30 @@ export type StatistikProgramBantuanDirect = {
 // ─── Fungsi fetch statistik pendidikan ───
 
 async function fetchStatistikPendidikanDirectRaw(): Promise<StatistikPendidikanDirect> {
+  // Prioritas 1: Ambil dari DB lokal statistik_desa
+  try {
+    const pendKK = getCategoryAggFromDb('pendidikan_kk');
+    const pendSedang = getCategoryAggFromDb('pendidikan_sedang');
+    if (pendKK.length > 0 || pendSedang.length > 0) {
+      const desaOk = (db.prepare(`
+        SELECT COUNT(DISTINCT s.desa_id) as c
+        FROM statistik_desa s
+        WHERE s.kategori IN ('pendidikan_kk', 'pendidikan_sedang') AND s.nama NOT IN ('JUMLAH', 'TOTAL', 'BELUM MENGISI')
+      `).get() as { c: number } | undefined)?.c ?? 0;
+      const totalDesa = (db.prepare('SELECT COUNT(*) as c FROM desa').get() as { c: number } | undefined)?.c ?? DESA_BANJARMANGU.length;
+
+      return {
+        desa_count: totalDesa,
+        desa_ok: desaOk,
+        pendidikan_kk: pendKK,
+        pendidikan_sedang: pendSedang,
+      };
+    }
+  } catch (err) {
+    console.error('Gagal baca statistik pendidikan dari DB lokal:', err);
+  }
+
+  // Fallback 2: Fetch paralel jika DB kosong
   const categories = ['PENDIDIKAN_KK', 'PENDIDIKAN_SEDANG'] as const;
 
   const allFetches: Promise<{ cat: string; desa: string; items: OpenSidStatistikItem[] } | null>[] = [];
@@ -895,6 +1037,32 @@ export async function getStatistikPendidikanDirect(): Promise<StatistikPendidika
 // ─── Fungsi fetch statistik kesehatan ───
 
 async function fetchStatistikKesehatanDirectRaw(): Promise<StatistikKesehatanDirect> {
+  // Prioritas 1: Ambil dari DB lokal statistik_desa
+  try {
+    const cacat = getCategoryAggFromDb('cacat', true);
+    const penyakit = getCategoryAggFromDb('penyakit_menahun', true);
+    const gol_darah = getCategoryAggFromDb('golongan_darah', true);
+    if (cacat.length > 0 || penyakit.length > 0 || gol_darah.length > 0) {
+      const desaOk = (db.prepare(`
+        SELECT COUNT(DISTINCT s.desa_id) as c
+        FROM statistik_desa s
+        WHERE s.kategori IN ('cacat', 'penyakit_menahun', 'golongan_darah') AND s.nama NOT IN ('JUMLAH', 'TOTAL', 'BELUM MENGISI')
+      `).get() as { c: number } | undefined)?.c ?? 0;
+      const totalDesa = (db.prepare('SELECT COUNT(*) as c FROM desa').get() as { c: number } | undefined)?.c ?? DESA_BANJARMANGU.length;
+
+      return {
+        desa_count: totalDesa,
+        desa_ok: desaOk,
+        cacat,
+        penyakit,
+        gol_darah,
+      };
+    }
+  } catch (err) {
+    console.error('Gagal baca statistik kesehatan dari DB lokal:', err);
+  }
+
+  // Fallback 2: Fetch paralel jika DB kosong
   const categories = ['CACAT', 'PENYAKIT', 'GOL_DARAH'] as const;
 
   const allFetches: Promise<{ cat: string; desa: string; items: OpenSidStatistikItem[] } | null>[] = [];

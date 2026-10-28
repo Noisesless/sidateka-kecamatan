@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { db, type Desa, type Artikel } from './db';
 import { fetchStatistikDesa } from './analitik';
+import { clearStatistikCache } from './statistik';
 import { isSafePublicUrl, sanitizeHtmlContent } from './security';
 import { getPerangkatFallbackAvatar } from './perangkat';
 
@@ -899,8 +900,12 @@ function upsertArtikel(items: Artikel[], desaId: number): UpsertResult {
         // JANGAN timpa data lama secara membabi-buta (skip pembaruan redundan).
         const isSameDate = (existing.published_at ?? '') === (r.published_at ?? '');
         const hasLocalImage = existing.gambar && existing.gambar.startsWith('/foto/');
+        const existingIsExcerpt = !existing.konten || stripHtml(existing.konten).endsWith('[...]') || stripHtml(existing.konten).length < 500;
+        const incomingIsLonger = (safeKonten?.length ?? 0) > (existing.konten?.length ?? 0) + 100;
+        const incomingIsNotExcerpt = safeKonten && !stripHtml(safeKonten).endsWith('[...]') && stripHtml(safeKonten).length >= 500;
 
-        if (isSameDate && hasLocalImage) {
+        // Hanya skip jika artikel lama sudah lengkap dan item baru tidak membawa konten yang lebih baik
+        if (isSameDate && hasLocalImage && !existingIsExcerpt && (!incomingIsLonger || !incomingIsNotExcerpt)) {
           skippedCount++;
         } else {
           updateStmt.run(safeRow);
@@ -1513,6 +1518,9 @@ export async function syncDesa(desa: Desa): Promise<SyncResult> {
     // Statistik analitik (di-throttle 20 jam di dalamnya; '' bila skip)
     try {
       statistikMsg = await fetchStatistikDesa(desa);
+      if (statistikMsg && !statistikMsg.includes('gagal')) {
+        clearStatistikCache();
+      }
     } catch (e) {
       statistikMsg = `statistik: gagal (${(e as Error).message})`;
     }
@@ -1575,6 +1583,37 @@ export async function syncDesa(desa: Desa): Promise<SyncResult> {
       const local = await downloadAndSaveImage(oa.gambar, 'artikel', desa.slug);
       if (local && local.startsWith('/foto/')) {
         db.prepare("UPDATE artikel SET gambar = ? WHERE id = ?").run(local, oa.id);
+      }
+    }
+  } catch {
+    // silent fallback
+  }
+
+  // Backfill artikel lama yang masih berstatus kutipan/cuplikan pendek ([...])
+  try {
+    const excerptArticles = db
+      .prepare(`
+        SELECT id, url, judul, konten 
+        FROM artikel 
+        WHERE desa_id = ? 
+          AND url IS NOT NULL 
+          AND (konten IS NULL OR konten LIKE '%[...]%' OR length(konten) < 500)
+        LIMIT 5
+      `)
+      .all(desa.id) as Array<{ id: number; url: string; judul: string; konten: string | null }>;
+
+    if (excerptArticles.length > 0 && !isCloudflareBlocked) {
+      for (const ea of excerptArticles) {
+        try {
+          const fullContent = await scrapeArticleDetail(ea.url);
+          if (fullContent && fullContent.length > (ea.konten?.length ?? 0)) {
+            const localized = await localizeHtmlImages(fullContent, desa.slug, 'artikel');
+            const sanitized = sanitizeHtmlContent(localized || fullContent);
+            db.prepare('UPDATE artikel SET konten = ? WHERE id = ?').run(sanitized, ea.id);
+          }
+        } catch {
+          // lanjut ke artikel berikutnya
+        }
       }
     }
   } catch {

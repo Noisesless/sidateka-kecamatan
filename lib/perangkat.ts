@@ -45,3 +45,4 @@ export function getPerangkatFallbackAvatar(
   // Default laki-laki
   return '/kuser.png';
 }
+
