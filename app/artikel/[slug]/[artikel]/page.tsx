@@ -68,6 +68,8 @@ async function fetchArticleContent(
     // OpenSID default uses Indonesian spelling (.artikel-content),
     // OpenSID Esensi/Natra theme (desa.id) uses .content-isi inside #printing
     const contentSelectors = [
+      ".content.space-y-2",
+      "div.content",
       ".artikelpage .isicontent",
       ".isicontent",
       ".content-isi",
@@ -94,8 +96,12 @@ async function fetchArticleContent(
       const $el = $(sel).first();
       if ($el.length) {
         // Remove the title heading from content (already shown in hero)
-        $el.find("h1, h2.title, .artikel-title, .entry-title, .post-title, .head-content").remove();
-        const html2 = $el.html()?.trim();
+
+        const $clone = $el.clone();
+        $clone.find("h1, h2.title, .artikel-title, .entry-title, .post-title, .head-content").remove();
+        $clone.find(".artikelmeta, .entry-meta, .post-meta, span.inline-flex").remove();
+        const text = $clone.text().replace(/\s+/g, " ").trim();
+        const html2 = text.length > 50 ? $clone.html()?.trim() : null;
         if (html2 && html2.length > 100) {
           konten = html2;
           break;

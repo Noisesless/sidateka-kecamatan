@@ -342,7 +342,12 @@ async function fetchRssXml(url: string, timeoutMs: number): Promise<string> {
 
 async function fetchRss(desa: Desa): Promise<Artikel[]> {
   if (!desa.feed_url) return [];
-  const parser = new Parser({ timeout: RSS_TIMEOUT, customFields: {} });
+  const parser = new Parser({
+    timeout: RSS_TIMEOUT,
+    customFields: {
+      item: ['content:encoded'],
+    },
+  });
   const xml = await fetchRssXml(desa.feed_url, RSS_TIMEOUT);
   const feed = await parser.parseString(xml);
   const items: Artikel[] = [];
@@ -351,11 +356,13 @@ async function fetchRss(desa: Desa): Promise<Artikel[]> {
     const url = (it.link || '').trim();
     if (!judul || !url) continue;
     const slug = slugify(judul) || slugify(url);
+    const rawItem = it as unknown as Record<string, unknown>;
+    const fullContent = ((rawItem['content:encoded'] as string) || it.content || '').trim();
     const ringkasan =
       it.contentSnippet?.trim() ||
       stripHtml(it.content || '').slice(0, 280) ||
       null;
-    const gambar = extractImage(it.content, desa.website) || null;
+    const gambar = extractImage(fullContent || it.content, desa.website) || null;
     const publishedAt = it.isoDate || it.pubDate || null;
     items.push({
       id: 0,
@@ -365,9 +372,9 @@ async function fetchRss(desa: Desa): Promise<Artikel[]> {
       slug,
       url,
       ringkasan,
-      konten: it.content || null,
+      konten: fullContent || null,
       gambar,
-      penulis: it.creator || it.author || null,
+      penulis: it.creator || (rawItem.author as string) || null,
       kategori: it.categories?.[0] || null,
       published_at: publishedAt,
       view_count: 0,
@@ -1284,7 +1291,7 @@ export async function ingestPushPayload(desaId: number, payload: PushPayload): P
       slug,
       url,
       ringkasan: (it.ringkasan ?? null)?.toString().slice(0, 2000) || null,
-      konten: null, // ringkasan saja, full content di situs desa
+      konten: ((it as Record<string, unknown>).konten ?? (it as Record<string, unknown>).isi ?? null)?.toString() || null,
       gambar: it.gambar || null,
       penulis: it.penulis || null,
       kategori: it.kategori || null,
