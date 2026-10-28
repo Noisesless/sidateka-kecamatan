@@ -266,8 +266,8 @@ CREATE TABLE visitor_daily (
 );
 
 CREATE TABLE statistik_snapshot (
-  cache_key TEXT PRIMARY KEY,
-  payload TEXT NOT NULL,
+  key TEXT PRIMARY KEY,
+  data_json TEXT NOT NULL,
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 ```
