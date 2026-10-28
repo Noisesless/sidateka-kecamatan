@@ -51,7 +51,7 @@ export function getRecentArtikel(limit = 12, desaSlug?: string): ArtikelWithDesa
        FROM artikel a
        JOIN desa d ON d.id = a.desa_id
        ${where}
-       ORDER BY COALESCE(a.published_at, a.fetched_at) DESC
+       ORDER BY a.published_at DESC NULLS LAST, a.id DESC
        LIMIT ?`,
     )
     .all(...(desaSlug ? [desaSlug, limit] : [limit])) as (Artikel & { d_slug: string; d_nama: string })[];
@@ -69,7 +69,7 @@ export function getHeroSlideArtikel(limit = 10): ArtikelWithDesa[] {
        FROM artikel a
        JOIN desa d ON d.id = a.desa_id
        WHERE a.gambar IS NOT NULL AND TRIM(a.gambar) != ''
-       ORDER BY COALESCE(a.published_at, a.fetched_at) DESC
+       ORDER BY a.published_at DESC NULLS LAST, a.id DESC
        LIMIT ?`,
     )
     .all(limit) as (Artikel & { d_slug: string; d_nama: string })[];
@@ -88,7 +88,7 @@ export function getHeroSlideArtikel(limit = 10): ArtikelWithDesa[] {
        FROM artikel a
        JOIN desa d ON d.id = a.desa_id
        WHERE 1=1 ${placeholders}
-       ORDER BY COALESCE(a.published_at, a.fetched_at) DESC
+       ORDER BY a.published_at DESC NULLS LAST, a.id DESC
        LIMIT ?`,
     )
     .all(...excludeIds, remaining) as (Artikel & { d_slug: string; d_nama: string })[];
@@ -105,7 +105,7 @@ export function getPaginatedArtikel(limit = 6, offset = 0, desaSlug?: string): A
        FROM artikel a
        JOIN desa d ON d.id = a.desa_id
        ${where}
-       ORDER BY COALESCE(a.published_at, a.fetched_at) DESC
+       ORDER BY a.published_at DESC NULLS LAST, a.id DESC
        LIMIT ? OFFSET ?`,
     )
     .all(...(desaSlug ? [desaSlug, limit, offset] : [limit, offset])) as (Artikel & { d_slug: string; d_nama: string })[];
@@ -131,7 +131,7 @@ export function getPopularArtikel(limit = 8): ArtikelWithDesa[] {
       `SELECT a.*, d.slug AS d_slug, d.nama AS d_nama
        FROM artikel a
        JOIN desa d ON d.id = a.desa_id
-       ORDER BY a.view_count DESC, COALESCE(a.published_at, a.fetched_at) DESC
+       ORDER BY a.view_count DESC, a.published_at DESC NULLS LAST, a.id DESC
        LIMIT ?`,
     )
     .all(limit) as (Artikel & { d_slug: string; d_nama: string })[];

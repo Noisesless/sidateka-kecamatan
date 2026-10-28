@@ -30,7 +30,7 @@ function timeAgo(s: string | null): string {
  */
 export function ArticleRowCard({ artikel }: { artikel: ArtikelWithDesa }) {
   const href = `/artikel/${artikel.desa.slug}/${artikel.slug}`;
-  const date = artikel.published_at ?? artikel.fetched_at;
+  const date = artikel.published_at;
 
   return (
     <article className="group rounded-lg border border-[var(--color-border)] bg-white overflow-hidden shadow-sm hover:shadow-lg transition-shadow">

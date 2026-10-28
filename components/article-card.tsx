@@ -35,7 +35,7 @@ export function ArticleCard({
   variant?: Variant;
 }) {
   const href = `/artikel/${artikel.desa.slug}/${artikel.slug}`;
-  const date = artikel.published_at ?? artikel.fetched_at;
+  const date = artikel.published_at;
 
   if (variant === "featured") {
     return (

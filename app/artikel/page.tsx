@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { getAllDesa, getRecentArtikel } from "@/lib/queries";
+import { getAllDesa, getPaginatedArtikel, getTotalArtikelCount } from "@/lib/queries";
 import { ArticleCard } from "@/components/article-card";
-import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -29,36 +28,9 @@ export default async function ArtikelIndexPage({
 
   // Query with LIMIT/OFFSET
   const offset = (page - 1) * PAGE_SIZE;
-  const rows = selectedDesa
-    ? (db
-        .prepare(
-          `SELECT a.id FROM artikel a JOIN desa d ON d.id = a.desa_id
-           WHERE d.slug = ?
-           ORDER BY COALESCE(a.published_at, a.fetched_at) DESC
-           LIMIT ? OFFSET ?`,
-        )
-        .all(selectedDesa.slug, PAGE_SIZE, offset) as { id: number }[])
-    : (db
-        .prepare(
-          `SELECT id FROM artikel
-           ORDER BY COALESCE(published_at, fetched_at) DESC
-           LIMIT ? OFFSET ?`,
-        )
-        .all(PAGE_SIZE, offset) as { id: number[] }[]);
-
-  // For simplicity fetch full articles via getRecentArtikel (limit max)
-  const all = getRecentArtikel(page * PAGE_SIZE, desaSlug);
-  const artikel = all.slice(offset, offset + PAGE_SIZE);
-
-  const totalRow = selectedDesa
-    ? (db
-        .prepare(
-          `SELECT COUNT(*) AS c FROM artikel a JOIN desa d ON d.id = a.desa_id WHERE d.slug = ?`,
-        )
-        .get(selectedDesa.slug) as { c: number })
-    : (db.prepare(`SELECT COUNT(*) AS c FROM artikel`).get() as { c: number });
-
-  const totalPages = Math.max(1, Math.ceil(totalRow.c / PAGE_SIZE));
+  const artikel = getPaginatedArtikel(PAGE_SIZE, offset, desaSlug);
+  const totalCount = getTotalArtikelCount(desaSlug);
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
@@ -72,7 +44,7 @@ export default async function ArtikelIndexPage({
             : "Semua Artikel"}
         </h1>
         <p className="text-sm text-[var(--color-muted-foreground)]">
-          {totalRow.c.toLocaleString("id-ID")} artikel · halaman {page} dari {totalPages}
+          {totalCount.toLocaleString("id-ID")} artikel · halaman {page} dari {totalPages}
         </p>
       </header>
 
