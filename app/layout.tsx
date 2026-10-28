@@ -29,7 +29,12 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const appUrl =
+  process.env.NEXT_PUBLIC_APP_URL ||
+  "https://sidateka.banjarmangu.banjarnegarakab.go.id";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(appUrl),
   title: {
     default: "SIDATEKA BANJARMANGU",
     template: "%s · SIDATEKA BANJARMANGU",
