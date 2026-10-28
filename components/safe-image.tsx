@@ -7,22 +7,25 @@ interface SafeImageProps {
   alt?: string;
   className?: string;
   fillContainer?: boolean;
+  fallbackSrc?: string;
 }
 
-const FALLBACK_SRC = "/placeholder-artikel.jpg";
+const DEFAULT_FALLBACK = "/placeholder-artikel.jpg";
 
 export function SafeImage({
   src,
   alt = "Foto Kegiatan Desa",
   className = "w-full h-full object-cover",
+  fallbackSrc = DEFAULT_FALLBACK,
 }: SafeImageProps) {
-  const [imgSrc, setImgSrc] = useState<string>(src || FALLBACK_SRC);
+  const effectiveFallback = fallbackSrc || DEFAULT_FALLBACK;
+  const [imgSrc, setImgSrc] = useState<string>(src || effectiveFallback);
   const [hasError, setHasError] = useState(false);
 
   const handleError = () => {
-    if (!hasError && imgSrc !== FALLBACK_SRC) {
+    if (!hasError && imgSrc !== effectiveFallback) {
       setHasError(true);
-      setImgSrc(FALLBACK_SRC);
+      setImgSrc(effectiveFallback);
     }
   };
 

@@ -1,29 +1,10 @@
 import type { PerangkatDesa } from '@/lib/db';
 import { SafeImage } from '@/components/safe-image';
-
-function UserIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-      strokeWidth={1.5}
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"
-      />
-    </svg>
-  );
-}
+import { getPerangkatFallbackAvatar } from '@/lib/perangkat';
 
 /**
- * Section aparatur desa: satu-satunya konten non-berita yang ditampilkan
- * di halaman publik desa. Konten profil hasil scrape sengaja tidak lagi
- * dirender di sini karena berantakan (menyeret seluruh chrome tema sumber);
- * datanya tetap tersimpan dan dapat dikelola via admin.
+ * Section aparatur desa: menampilkan foto aparatur desa atau
+ * avatar profesional fallback (wuser wanita, kuser laki-laki).
  */
 function DesaPerangkatSection({ perangkat = [] }: { perangkat?: PerangkatDesa[] }) {
   if (perangkat.length === 0) return null;
@@ -47,32 +28,45 @@ function DesaPerangkatSection({ perangkat = [] }: { perangkat?: PerangkatDesa[] 
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-        {perangkat.map((p) => (
-          <div
-            key={p.id}
-            className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-white shadow-sm"
-          >
-            {p.foto_url ? (
-              <div className="aspect-[3/4] w-full overflow-hidden bg-[var(--color-muted)]">
-                <SafeImage
-                  src={p.foto_url}
-                  alt={p.nama}
-                  className="h-full w-full object-cover object-top"
-                />
+        {perangkat.map((p) => {
+          const fallbackAvatar = getPerangkatFallbackAvatar(p.nama, p.jabatan, p.foto_url);
+          const hasRealPhoto = !!(
+            p.foto_url &&
+            p.foto_url.startsWith('/foto/sync/') &&
+            !p.foto_url.includes('placeholder')
+          );
+
+          return (
+            <div
+              key={p.id}
+              className="group overflow-hidden rounded-2xl border border-[var(--color-border)] bg-white shadow-xs hover:shadow-md hover:border-[var(--color-primary)]/40 transition-all duration-200 flex flex-col"
+            >
+              <div className="aspect-[3/4] w-full overflow-hidden bg-gradient-to-b from-[#f8fafc] to-[#e2e8f0]/40 flex items-center justify-center p-2.5">
+                {hasRealPhoto ? (
+                  <SafeImage
+                    src={p.foto_url}
+                    alt={p.nama}
+                    fallbackSrc={fallbackAvatar}
+                    className="h-full w-full object-cover object-top rounded-xl"
+                  />
+                ) : (
+                  <img
+                    src={fallbackAvatar}
+                    alt={p.nama}
+                    loading="lazy"
+                    className="h-full w-full object-contain p-2.5 drop-shadow-sm group-hover:scale-105 transition-transform duration-200"
+                  />
+                )}
               </div>
-            ) : (
-              <div className="flex aspect-[3/4] w-full items-center justify-center bg-[var(--color-primary)]/5 text-[var(--color-muted-foreground)]">
-                <UserIcon className="h-16 w-16" />
+              <div className="p-3.5 text-center mt-auto border-t border-[var(--color-border)]/50 bg-white">
+                <p className="text-sm font-semibold leading-snug text-[var(--color-foreground)]">{p.nama}</p>
+                {p.jabatan && (
+                  <p className="mt-1 text-xs text-[var(--color-muted-foreground)] line-clamp-2">{p.jabatan}</p>
+                )}
               </div>
-            )}
-            <div className="p-3 text-center">
-              <p className="text-sm font-semibold leading-snug text-[var(--color-foreground)]">{p.nama}</p>
-              {p.jabatan && (
-                <p className="mt-0.5 text-xs text-[var(--color-muted-foreground)]">{p.jabatan}</p>
-              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </section>
   );

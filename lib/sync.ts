@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import { db, type Desa, type Artikel } from './db';
 import { fetchStatistikDesa } from './analitik';
 import { isSafePublicUrl, sanitizeHtmlContent } from './security';
+import { getPerangkatFallbackAvatar } from './perangkat';
 
 const UPLOAD_DIR =
   process.env.UPLOAD_DIR || path.join(process.cwd(), '.data', 'uploads');
@@ -1279,7 +1280,7 @@ function replacePerangkatDesa(desaId: number, rows: AparaturEntry[]): void {
     const finalFoto =
       r.foto && r.foto.startsWith('/foto/')
         ? r.foto
-        : existingPhotoMap.get(key) || r.foto;
+        : existingPhotoMap.get(key) || getPerangkatFallbackAvatar(r.nama, r.jabatan, r.foto);
     ins.run(desaId, r.nama.slice(0, 200), r.jabatan.slice(0, 200), finalFoto, i);
   });
 }
@@ -1363,8 +1364,11 @@ export async function fetchProfilDesa(desa: Desa): Promise<string> {
   if (perangkatMap.size > 0) {
     const rows = [...perangkatMap.values()];
     for (const r of rows) {
-      if (r.foto) {
+      if (r.foto && !r.foto.startsWith('/')) {
         r.foto = await downloadAndSaveImage(r.foto, 'perangkat', desa.slug);
+      }
+      if (!r.foto || r.foto.includes('placeholder')) {
+        r.foto = getPerangkatFallbackAvatar(r.nama, r.jabatan, r.foto);
       }
     }
     replacePerangkatDesa(desa.id, rows);

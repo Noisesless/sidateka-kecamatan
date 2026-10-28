@@ -1,3 +1,4 @@
+import { getPerangkatFallbackAvatar } from './perangkat';
 import { db, hashPassword } from './db';
 
 // Daftar 17 desa di Kecamatan Banjarmangu, Kabupaten Banjarnegara
