@@ -53,12 +53,13 @@ function DesaPerangkatSection({ perangkat = [] }: { perangkat?: PerangkatDesa[] 
             className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-white shadow-sm"
           >
             {p.foto_url ? (
-              <img
-                src={p.foto_url}
-                alt={p.nama}
-                loading="lazy"
-                className="aspect-[3/4] w-full object-cover object-top"
-              />
+              <div className="aspect-[3/4] w-full overflow-hidden bg-[var(--color-muted)]">
+                <SafeImage
+                  src={p.foto_url}
+                  alt={p.nama}
+                  className="h-full w-full object-cover object-top"
+                />
+              </div>
             ) : (
               <div className="flex aspect-[3/4] w-full items-center justify-center bg-[var(--color-primary)]/5 text-[var(--color-muted-foreground)]">
                 <UserIcon className="h-16 w-16" />

@@ -5,13 +5,9 @@ import { db } from "@/lib/db";
 import { getArtikelByDesaAndSlug, getRecentArtikel } from "@/lib/queries";
 import { ArticleCard } from "@/components/article-card";
 import { SafeImage } from "@/components/safe-image";
-import { isSafePublicUrl, sanitizeHtmlContent } from "@/lib/security";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
-const USER_AGENT =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
 function decodeEntities(s: string | null): string {
   if (!s) return "";
@@ -37,107 +33,6 @@ function stripHtml(html: string): string {
     .replace(/<[^>]+>/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-}
-
-/**
- * Fetch article content on-the-fly from the original desa website.
- * Tries multiple selectors for different OpenSID themes.
- * Returns { ringkasan, konten } or null if fetch fails.
- */
-async function fetchArticleContent(
-  url: string
-): Promise<{ ringkasan: string; konten: string } | null> {
-  // Anti-SSRF check: cegah server fetch ke IP loopback/privat/metadata
-  if (!isSafePublicUrl(url)) return null;
-
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 30_000);
-    const res = await fetch(url, {
-      headers: {
-        "User-Agent": USER_AGENT,
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-        "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
-      },
-      signal: controller.signal,
-    });
-    clearTimeout(timer);
-    if (!res.ok) return null;
-
-    const html = await res.text();
-    const $ = cheerio.load(html);
-
-    // Remove noise elements
-    $("script, style, nav, header, footer, .navbar, .sidebar, .comments, .comment, .widget, .adsbygoogle, iframe").remove();
-    // Remove share sections from desa website
-    $("[class*='share'], [class*='Share'], [id*='share'], .social-share, .share-buttons, .share-this").remove();
-    $(":contains('Share this article')").each((_i, el) => {
-      const $el = $(el);
-      if ($el.children().length > 0 && $el.text().trim().startsWith("Share this article")) {
-        $el.remove();
-      }
-    });
-
-    // Try multiple selectors for article content (OpenSID themes vary)
-    // OpenDesa theme uses English spelling (.article-content),
-    // OpenSID default uses Indonesian spelling (.artikel-content),
-    // OpenSID Esensi/Natra theme (desa.id) uses .content-isi inside #printing
-    const contentSelectors = [
-      ".artikelpage .isicontent",
-      ".isicontent",
-      ".content.space-y-2",
-      "div.content",
-      ".content-isi",
-      "#printing .content-area",
-      ".article-content",
-      ".article-body",
-      ".artikel-content",
-      ".artikel .content",
-      ".artikel",
-      ".entry-content",
-      ".post-content",
-      ".post-body",
-      "article .content",
-      "article",
-      "#content .artikel",
-      "#content article",
-      ".main-content article",
-      ".main-content .artikel",
-      ".article-detail-container",
-    ];
-
-    let konten: string | null = null;
-    for (const sel of contentSelectors) {
-      const $el = $(sel).first();
-      if ($el.length) {
-        // Remove the title heading from content (already shown in hero)
-
-        const $clone = $el.clone();
-        $clone.find("h1, h2.title, .artikel-title, .entry-title, .post-title, .head-content").remove();
-        $clone.find(".artikelmeta, .entry-meta, .post-meta, span.inline-flex").remove();
-        const text = $clone.text().replace(/\s+/g, " ").trim();
-        const html2 = text.length > 50 ? $clone.html()?.trim() : null;
-        if (html2 && html2.length > 100) {
-          konten = html2;
-          break;
-        }
-      }
-    }
-
-    if (!konten) return null;
-
-    const safeKonten = sanitizeHtmlContent(konten);
-    // Generate ringkasan from konten
-    const text = stripHtml(safeKonten);
-    const ringkasan =
-      text.length > 280
-        ? text.slice(0, text.slice(0, 280).lastIndexOf(" ") || 280) + " [...]"
-        : text;
-
-    return { ringkasan, konten: safeKonten };
-  } catch {
-    return null;
-  }
 }
 
 type Params = { slug: string; artikel: string };
@@ -182,22 +77,9 @@ export default async function ArtikelDetailPage({
   // Increment view count
   db.prepare("UPDATE artikel SET view_count = view_count + 1 WHERE id = ?").run(a.id);
 
-  // Fetch konten lengkap dari situs desa jika konten belum ada ATAU hanya berisi
-  // excerpt RSS (feed OpenSID memotong isi artikel dengan akhiran "[...]").
-  let ringkasan = a.ringkasan;
-  let konten = a.konten;
-  const kontenHanyaExcerpt = !konten || stripHtml(konten).endsWith("[...]") || stripHtml(konten).length < 500;
-  if (kontenHanyaExcerpt && a.url) {
-    const fetched = await fetchArticleContent(a.url);
-    if (fetched) {
-      ringkasan = fetched.ringkasan;
-      konten = fetched.konten;
-      // Save to database so future visits don't need to re-fetch
-      db.prepare(
-        "UPDATE artikel SET ringkasan = ?, konten = ? WHERE id = ?"
-      ).run(ringkasan, konten, a.id);
-    }
-  }
+  // Baca ringkasan dan konten langsung dari database lokal (zero on-the-fly fetch)
+  const ringkasan = a.ringkasan;
+  const konten = a.konten;
 
   // Bersihkan dan format ringkasan & konten
   const cleanRingkasan = decodeEntities(ringkasan);
@@ -215,8 +97,7 @@ export default async function ArtikelDetailPage({
     });
 
     // Hapus gambar utama di awal konten jika foto utama (a.gambar) sudah ditampilkan di hero banner.
-    // Ini menghilangkan redundansi foto ganda dan mencegah ikon gambar rusak (broken image)
-    // akibat hotlink protection / WAF server desa.
+    // Ini menghilangkan redundansi foto ganda.
     if (a.gambar) {
       const $firstImg = $clean("img").first();
       if ($firstImg.length) {
@@ -421,7 +302,7 @@ export default async function ArtikelDetailPage({
           </a>
         </div>
 
-        {/* CTA: Baca artikel lengkap di situs desa */}
+        {/* CTA: Rujukan sumber resmi di situs desa */}
         <div className="relative overflow-hidden rounded-2xl border-2 border-[var(--color-primary)] bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-foreground)] text-white p-7 sm:p-9 mb-8">
           <div className="absolute -right-8 -top-8 w-40 h-40 rounded-full bg-white/5 blur-2xl pointer-events-none" />
           <div className="absolute -left-10 -bottom-10 w-48 h-48 rounded-full bg-[var(--color-accent)]/20 blur-3xl pointer-events-none" />
@@ -498,7 +379,7 @@ export default async function ArtikelDetailPage({
             <h2 className="font-serif text-2xl font-bold mb-6">
               Artikel Lainnya dari Desa {a.desa.nama}
             </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {related.map((r) => (
                 <ArticleCard key={r.id} artikel={r} />
               ))}

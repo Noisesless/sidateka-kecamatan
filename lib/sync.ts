@@ -150,6 +150,96 @@ export async function downloadAndSaveImage(
   }
 }
 
+
+/**
+ * Unduh semua gambar remote yang ada di dalam HTML konten dan ganti src-nya
+ * dengan URL lokal (/foto/sync/<subfolder>/<filename>).
+ */
+export async function localizeHtmlImages(
+  html: string | null | undefined,
+  desaSlug: string,
+  subfolder: 'artikel' | 'profil' = 'artikel'
+): Promise<string | null> {
+  if (!html) return null;
+  const $ = cheerio.load(html, null, false);
+  const imgs = $('img').toArray();
+  if (imgs.length === 0) return html;
+
+  for (const el of imgs) {
+    const src = $(el).attr('src');
+    if (src && (src.startsWith('http://') || src.startsWith('https://'))) {
+      try {
+        const localUrl = await downloadAndSaveImage(src, subfolder, desaSlug);
+        if (localUrl) {
+          $(el).attr('src', localUrl);
+        }
+      } catch {
+        $(el).attr('src', '/placeholder-artikel.jpg');
+      }
+      $(el).attr('loading', 'lazy');
+      $(el).attr('referrerpolicy', 'no-referrer');
+    }
+  }
+
+  return $.html();
+}
+
+/**
+ * Scrape halaman detail artikel untuk mendapatkan konten HTML utuh (deep scrape).
+ * Berjalan pada proses sync di background, bukan on-the-fly saat user membuka halaman.
+ */
+export async function scrapeArticleDetail(url: string): Promise<string | null> {
+  if (!isSafePublicUrl(url)) return null;
+  try {
+    const html = await fetchText(url, 25_000);
+    const $ = cheerio.load(html);
+
+    // Hapus elemen yang bukan isi artikel
+    $('script, style, nav, header, footer, .navbar, .sidebar, .comments, .comment, .widget, .adsbygoogle, iframe').remove();
+    $("[class*='share'], [class*='Share'], [id*='share'], .social-share, .share-buttons, .share-this").remove();
+
+    const contentSelectors = [
+      '.artikelpage .isicontent',
+      '.isicontent',
+      '.content.space-y-2',
+      'div.content',
+      '.content-isi',
+      '#printing .content-area',
+      '.article-content',
+      '.article-body',
+      '.artikel-content',
+      '.artikel .content',
+      '.artikel',
+      '.entry-content',
+      '.post-content',
+      '.post-body',
+      'article .content',
+      'article',
+    ];
+
+    let konten: string | null = null;
+    for (const sel of contentSelectors) {
+      const $el = $(sel).first();
+      if ($el.length) {
+        const $clone = $el.clone();
+        $clone.find('h1, h2.title, .artikel-title, .entry-title, .post-title, .head-content').remove();
+        $clone.find('.artikelmeta, .entry-meta, .post-meta, span.inline-flex').remove();
+        const text = $clone.text().replace(/\s+/g, ' ').trim();
+        const candidate = text.length > 50 ? $clone.html()?.trim() : null;
+        if (candidate && candidate.length > 100) {
+          konten = candidate;
+          break;
+        }
+      }
+    }
+
+    if (!konten) return null;
+    return sanitizeHtmlContent(konten);
+  } catch {
+    return null;
+  }
+}
+
 function extractImage(content: string | undefined, base: string): string | null {
   if (!content) return null;
   const $ = cheerio.load(content);
@@ -1245,9 +1335,12 @@ export async function fetchProfilDesa(desa: Desa): Promise<string> {
       }
       const ogImg = $('meta[property="og:image"]').attr('content')?.trim() || null;
       const ogAbs = ogImg ? absolutizeUrl(ogImg, t.url) : null;
-      // og:image dari situs sumber kadang terpotong/rusak — abaikan jika bukan URL gambar valid
-      const gambar = ogAbs && IMG_SRC_RX.test(ogAbs) ? ogAbs : null;
-      upsertProfil(desa.id, t.jenis, judul, konten.slice(0, MAX_PROFIL_HTML), gambar, t.url);
+      let gambar = ogAbs && IMG_SRC_RX.test(ogAbs) ? ogAbs : null;
+      if (gambar) {
+        gambar = await downloadAndSaveImage(gambar, 'profil', desa.slug);
+      }
+      const localizedKonten = await localizeHtmlImages(konten.slice(0, MAX_PROFIL_HTML), desa.slug, 'profil');
+      upsertProfil(desa.id, t.jenis, judul, localizedKonten || konten.slice(0, MAX_PROFIL_HTML), gambar, t.url);
       saved++;
       await new Promise((r) => setTimeout(r, 400));
     } catch {
@@ -1346,6 +1439,9 @@ export async function ingestPushPayload(desaId: number, payload: PushPayload): P
     if (item.gambar) {
       item.gambar = await downloadAndSaveImage(item.gambar, 'artikel', desaSlug);
     }
+    if (item.konten) {
+      item.konten = await localizeHtmlImages(item.konten, desaSlug, 'artikel');
+    }
   }
 
   const { newCount, updatedCount } = upsertArtikel(items, desaId);
@@ -1443,6 +1539,24 @@ export async function syncDesa(desa: Desa): Promise<SyncResult> {
       const local = await downloadAndSaveImage(item.gambar, 'artikel', desa.slug);
       if (local && local.startsWith('/foto/')) photoSaved++;
       item.gambar = local;
+    }
+
+    // Jika konten hanya cuplikan RSS / excerpt pendek, coba tarik konten lengkap saat sync
+    const isExcerpt = !item.konten || stripHtml(item.konten).endsWith('[...]') || stripHtml(item.konten).length < 500;
+    if (isExcerpt && item.url && !isCloudflareBlocked) {
+      try {
+        const fullContent = await scrapeArticleDetail(item.url);
+        if (fullContent) {
+          item.konten = fullContent;
+        }
+      } catch {
+        // silent fallback
+      }
+    }
+
+    // Lokalkan semua tag <img src="http..."> di dalam HTML konten artikel
+    if (item.konten) {
+      item.konten = await localizeHtmlImages(item.konten, desa.slug, 'artikel');
     }
   }
 

@@ -247,13 +247,7 @@ export default async function HomePage(props: {
                 <h3 className="font-serif text-xl font-semibold mb-2">
                   Belum ada artikel
                 </h3>
-                <p className="text-sm text-[var(--color-muted-foreground)] mb-4">
-                  Jalankan sinkronisasi untuk menarik artikel terbaru dari website
-                  desa.
-                </p>
-                <code className="block bg-[var(--color-muted)] rounded-md p-3 text-xs font-mono">
-                  curl -X POST /api/sync
-                </code>
+                <p className="text-sm text-[var(--color-muted-foreground)]">Artikel publikasi terbaru dari desa-desa di Kecamatan Banjarmangu akan ditampilkan di sini.</p>
               </div>
             )}
           </div>
@@ -443,7 +437,7 @@ export default async function HomePage(props: {
                 Portal Desa di Banjarmangu
               </h2>
               <p className="text-sm text-[var(--color-muted-foreground)] mt-1">
-                Status sinkronisasi terakhir dari website resmi masing-masing desa
+                Portal informasi dan publikasi resmi dari 17 desa di wilayah Banjarmangu
               </p>
             </div>
             <Link

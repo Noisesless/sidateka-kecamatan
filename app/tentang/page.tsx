@@ -89,7 +89,7 @@ export default function TentangPage() {
           <div className="font-serif text-2xl font-bold text-[var(--color-primary)]">
             {stats.lastSync ? new Date(stats.lastSync).toLocaleDateString("id-ID", { day: "2-digit", month: "short" }) : "—"}
           </div>
-          <div className="text-[11px] uppercase tracking-widest text-[var(--color-muted-foreground)] font-semibold mt-1">Sync Terakhir</div>
+          <div className="text-[11px] uppercase tracking-widest text-[var(--color-muted-foreground)] font-semibold mt-1">Pembaruan Terakhir</div>
         </div>
       </div>
 
@@ -145,11 +145,10 @@ export default function TentangPage() {
 
       <section className="rounded-2xl bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-foreground)] p-8 sm:p-10 text-white">
         <h2 className="font-serif text-2xl sm:text-3xl font-bold mb-3 !text-white">
-          Ingin mencoba?
+          Jelajahi Portal Sidateka
         </h2>
         <p className="text-white/80 mb-6 max-w-2xl leading-relaxed">
-          Trigger sinkronisasi secara manual atau atur jadwal otomatis via cron
-          eksternal yang memanggil endpoint sync.
+          Temukan publikasi berita terkini, profil wilayah, dan data analitik kependudukan dari 17 desa di wilayah Kecamatan Banjarmangu.
         </p>
         <div className="flex flex-wrap gap-3">
           <Link
@@ -158,9 +157,12 @@ export default function TentangPage() {
           >
             Lihat Artikel
           </Link>
-          <code className="inline-flex items-center px-4 py-2.5 rounded-lg bg-white/10 border border-white/20 text-xs font-mono">
-            POST /api/sync
-          </code>
+          <Link
+            href="/desa"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 font-semibold transition-colors"
+          >
+            Daftar Desa
+          </Link>
         </div>
       </section>
     </div>

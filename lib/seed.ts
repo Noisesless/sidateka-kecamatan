@@ -52,50 +52,25 @@ export function seedDesa() {
   const insertMany = db.transaction((rows: typeof DESA_BANJARMANGU) => {
     for (const r of rows) {
       stmt.run({
-        slug: r.slug,
-        nama: r.nama,
-        website: r.website,
+        ...r,
         feed_url: `${r.website}/feed`,
       });
     }
   });
   insertMany(DESA_BANJARMANGU);
-
-  // Buat admin default (username: admin, password: admin123).
-  // Pakai INSERT OR IGNORE supaya race antar worker build tidak error.
-  db.prepare(
-    'INSERT OR IGNORE INTO admin_user (username, password_hash) VALUES (?, ?)',
-  ).run('admin', hashPassword('admin123'));
-  seedPerangkatDesa();
 }
 
-/** Seed tabel profil_kecamatan jika belum ada */
-export function seedProfilKecamatan() {
-  // Buat tabel jika belum ada
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS profil_kecamatan (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      nama_kecamatan TEXT NOT NULL DEFAULT 'Banjarmangu',
-      kabupaten TEXT NOT NULL DEFAULT 'Banjarnegara',
-      provinsi TEXT NOT NULL DEFAULT 'Jawa Tengah',
-      kode_wilayah TEXT,
-      visi TEXT,
-      misi TEXT,
-      sejarah TEXT,
-      letak_geografis TEXT,
-      struktur_pemerintahan TEXT,
-      alamat_kantor TEXT,
-      telepon_kantor TEXT,
-      email_kantor TEXT,
-      website_sumber TEXT NOT NULL DEFAULT 'https://banjarmangu.banjarnegarakab.go.id/',
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-  `);
+export function seedAdmin() {
+  const existing = db.prepare('SELECT id FROM admin_user WHERE username = ?').get('admin');
+  if (!existing) {
+    const hash = hashPassword('admin123');
+    db.prepare('INSERT INTO admin_user (username, password_hash) VALUES (?, ?)').run('admin', hash);
+  }
+}
 
-  // Seed data jika kosong
-  const profilCount = db.prepare("SELECT COUNT(*) AS c FROM profil_kecamatan").get() as { c: number };
-  if (profilCount.c === 0) {
+export function seedProfilKecamatan() {
+  const count = (db.prepare('SELECT COUNT(*) AS c FROM profil_kecamatan').get() as { c: number }).c;
+  if (count === 0) {
     db.prepare(`
       INSERT INTO profil_kecamatan (nama_kecamatan, kabupaten, provinsi, website_sumber)
       VALUES ('Banjarmangu', 'Banjarnegara', 'Jawa Tengah', 'https://banjarmangu.banjarnegarakab.go.id/')
@@ -108,32 +83,32 @@ export function seedPerangkatDesa() {
   if (count > 5) return; // Sudah terisi
 
   const sijenggungPamong = [
-    { nama: 'SUYONO', jabatan: 'Kepala Desa', foto: 'https://sijenggung-banjarnegara.desa.id/desa/upload/user_pict/1662428873208010.jpeg' },
-    { nama: 'TEGUH GIANA', jabatan: 'Sekretaris Desa', foto: 'https://sijenggung-banjarnegara.desa.id/desa/upload/user_pict/2kwrb_pamong_1790580951-51-183221.webp' },
-    { nama: 'SUPRIYANTO', jabatan: 'Kasi Kesejahteraan', foto: 'https://sijenggung-banjarnegara.desa.id/desa/upload/user_pict/166242887360780.jpeg' },
-    { nama: 'WAHYUDIANA', jabatan: 'Kasi Pelayanan', foto: 'https://sijenggung-banjarnegara.desa.id/desa/upload/user_pict/1662428873696283.jpeg' },
-    { nama: 'TATUN FITNA ARIASIH', jabatan: 'Kasi Pemerintahan', foto: 'https://sijenggung-banjarnegara.desa.id/desa/upload/user_pict/1662428873892155.jpg' },
-    { nama: 'SAKHERUN', jabatan: 'Kaur Umum', foto: 'https://sijenggung-banjarnegara.desa.id/desa/upload/user_pict/1662428873832129.jpeg' },
-    { nama: 'SIGIT WAGITO', jabatan: 'Kaur Perencanaan', foto: 'https://sijenggung-banjarnegara.desa.id/desa/upload/user_pict/166242887368230.jpg' },
-    { nama: 'DEPI LASPRIATI', jabatan: 'Kaur Keuangan', foto: 'https://sijenggung-banjarnegara.desa.id/desa/upload/user_pict/166242887333386.jpeg' },
-    { nama: 'AMIN SETIANTO', jabatan: 'Kadus I', foto: 'https://sijenggung-banjarnegara.desa.id/desa/upload/user_pict/1662428873222622.jpeg' },
-    { nama: 'BISPANTO', jabatan: 'Kadus II', foto: 'https://sijenggung-banjarnegara.desa.id/desa/upload/user_pict/1662428873369144.jpeg' },
-    { nama: 'PONDEH', jabatan: 'Kadus III', foto: 'https://sijenggung-banjarnegara.desa.id/desa/upload/user_pict/WRY2r_pamong_1779711955-48-970703.webp' },
+    { nama: 'SUYONO', jabatan: 'Kepala Desa', foto: null },
+    { nama: 'TEGUH GIANA', jabatan: 'Sekretaris Desa', foto: null },
+    { nama: 'SUPRIYANTO', jabatan: 'Kasi Kesejahteraan', foto: null },
+    { nama: 'WAHYUDIANA', jabatan: 'Kasi Pelayanan', foto: null },
+    { nama: 'TATUN FITNA ARIASIH', jabatan: 'Kasi Pemerintahan', foto: null },
+    { nama: 'SAKHERUN', jabatan: 'Kaur Umum', foto: null },
+    { nama: 'SIGIT WAGITO', jabatan: 'Kaur Perencanaan', foto: null },
+    { nama: 'DEPI LASPRIATI', jabatan: 'Kaur Keuangan', foto: null },
+    { nama: 'AMIN SETIANTO', jabatan: 'Kadus I', foto: null },
+    { nama: 'BISPANTO', jabatan: 'Kadus II', foto: null },
+    { nama: 'PONDEH', jabatan: 'Kadus III', foto: null },
   ];
 
   const pasehPamong = [
-    { nama: 'WARIS MUSTOFA', jabatan: 'Kepala Desa', foto: 'https://paseh-banjarnegara.desa.id/desa/upload/user_pict/1740108404964204.jpg' },
-    { nama: 'SURANTO', jabatan: 'Sekretaris', foto: 'https://paseh-banjarnegara.desa.id/desa/upload/user_pict/1740108445484862.jpg' },
-    { nama: 'PUTHUT HERI CAHYADI', jabatan: 'Kepala Seksi Pemerintahan', foto: 'https://paseh-banjarnegara.desa.id/desa/upload/user_pict/1740108462981018.jpg' },
-    { nama: 'YAYAN BUDHI PRASETYA', jabatan: 'Kepala Urusan TU-Umum', foto: 'https://paseh-banjarnegara.desa.id/desa/upload/user_pict/1740108479871688.jpg' },
-    { nama: 'RASMONO', jabatan: 'Kepala Seksi Kesejahteraan', foto: 'https://paseh-banjarnegara.desa.id/desa/upload/user_pict/1740108491131939.jpg' },
-    { nama: 'KUSWAJI', jabatan: 'Kepala Urusan Keuangan', foto: 'https://paseh-banjarnegara.desa.id/desa/upload/user_pict/1740108506606254.jpg' },
-    { nama: 'BURHANUDIN', jabatan: 'Kepala Seksi Pelayanan', foto: 'https://paseh-banjarnegara.desa.id/desa/upload/user_pict/1740108531979968.jpg' },
-    { nama: 'AHLUL NAZA', jabatan: 'Kepala Urusan Perencanaan', foto: 'https://paseh-banjarnegara.desa.id/desa/upload/user_pict/1740108546683805.jpg' },
-    { nama: 'YATIN BUDIMAN', jabatan: 'Kepala Dusun I', foto: 'https://paseh-banjarnegara.desa.id/desa/upload/user_pict/1740108558173007.jpg' },
-    { nama: 'SLAMET PRIYONO', jabatan: 'Kepala Dusun II', foto: 'https://paseh-banjarnegara.desa.id/desa/upload/user_pict/1740108572543952.jpg' },
-    { nama: 'AKHMAD PRASOJO', jabatan: 'Kepala Dusun III', foto: 'https://paseh-banjarnegara.desa.id/desa/upload/user_pict/1740108655611182.jpg' },
-    { nama: 'MISTAR', jabatan: 'Kepala Dusun IV', foto: 'https://paseh-banjarnegara.desa.id/desa/upload/user_pict/1740108672874466.jpg' },
+    { nama: 'WARIS', jabatan: 'Kepala Desa', foto: '/foto/sync/perangkat/paseh-787c601f08a2.jpg' },
+    { nama: 'SURANTO', jabatan: 'Sekretaris', foto: '/foto/sync/perangkat/paseh-415549cc63cb.jpg' },
+    { nama: 'PUTHUT HERI CAHYADI', jabatan: 'Kepala Seksi Pemerintahan', foto: '/foto/sync/perangkat/paseh-7d93ae1933df.jpg' },
+    { nama: 'YAYAN BUDHI PRASETYA', jabatan: 'Kepala Urusan TU-Umum', foto: '/foto/sync/perangkat/paseh-d5eaf85d4993.jpg' },
+    { nama: 'RASMONO', jabatan: 'Kepala Seksi Kesejahteraan', foto: '/foto/sync/perangkat/paseh-2a31b59f890c.jpg' },
+    { nama: 'KUSWAJI', jabatan: 'Kepala Urusan Keuangan', foto: '/foto/sync/perangkat/paseh-77bd84730ff8.jpg' },
+    { nama: 'BURHANUDIN', jabatan: 'Kepala Seksi Pelayanan', foto: '/foto/sync/perangkat/paseh-478b986eca26.jpg' },
+    { nama: 'AHLUL NAZA', jabatan: 'Kepala Urusan Perencanaan', foto: '/foto/sync/perangkat/paseh-ec113f7a25e5.jpg' },
+    { nama: 'YATIN BUDIMAN', jabatan: 'Kepala Dusun I', foto: '/foto/sync/perangkat/paseh-a18830d8e39c.jpg' },
+    { nama: 'SLAMET PRIYONO', jabatan: 'Kepala Dusun II', foto: '/foto/sync/perangkat/paseh-0d55cf65ba41.jpg' },
+    { nama: 'AKHMAD PRASOJO', jabatan: 'Kepala Dusun III', foto: '/foto/sync/perangkat/paseh-f1426ab0b4c1.jpg' },
+    { nama: 'MISTAR', jabatan: 'Kepala Dusun IV', foto: '/foto/sync/perangkat/paseh-d13631423873.jpg' },
   ];
 
   const prendenganPamong = [

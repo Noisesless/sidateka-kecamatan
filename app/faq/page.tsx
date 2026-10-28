@@ -46,9 +46,9 @@ const DESA_FAQ: FaqItem[] = [
       "Buka menu Statistik Penduduk. Data ditampilkan dalam bentuk tabel dan grafik per desa, berisi jumlah penduduk, laki-laki, perempuan, dan jumlah Kepala Keluarga. Data diperbarui secara berkala dari sumber resmi.",
   },
   {
-    question: "Apa arti status 'Belum Sinkronisasi' pada kartu desa?",
+    question: "Bagaimana jika suatu desa belum memiliki artikel di portal?",
     answer:
-      "Status 'Belum Sinkronisasi' berarti data desa belum pernah ditarik dari website desa terkait. Status 'Gagal Sinkronisasi' berarti percobaan sinkronisasi pernah dilakukan namun gagal. Data akan diperbarui secara berkala oleh admin.",
+      "Seluruh 17 desa di Kecamatan Banjarmangu telah terhubung ke portal Sidateka. Apabila ada desa yang belum mempublikasikan artikel terbaru, sistem tetap menyediakan tautan langsung ke website resmi desa terkait.",
   },
   {
     question: "Dari mana data statistik penduduk berasal?",
@@ -63,7 +63,7 @@ const DESA_FAQ: FaqItem[] = [
   {
     question: "Apakah semua website desa sudah terkoneksi?",
     answer:
-      "Sebagian besar desa sudah terkoneksi. Desa yang belum terkoneksi akan menampilkan status 'Belum Sinkronisasi' pada kartunya. Anda tetap dapat mengunjungi website desa secara langsung melalui tautan yang tersedia.",
+      "Ya, seluruh 17 website resmi desa di Kecamatan Banjarmangu telah terintegrasi di portal Sidateka untuk memudahkan warga mengakses informasi secara terpusat.",
   },
 ];
 

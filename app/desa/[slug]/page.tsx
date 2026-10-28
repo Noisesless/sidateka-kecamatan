@@ -16,21 +16,8 @@ export async function generateMetadata({ params }: { params: Promise<Params> }) 
   if (!d) return { title: "Desa tidak ditemukan" };
   return {
     title: `Desa ${d.nama}`,
-    description: `Portal agregator artikel Desa ${d.nama}, Kecamatan Banjarmangu, Kabupaten Banjarnegara.`,
+    description: `Portal publikasi dan informasi resmi Desa ${d.nama}, Kecamatan Banjarmangu, Kabupaten Banjarnegara.`,
   };
-}
-
-function formatDate(s: string | null): string {
-  if (!s) return "Belum pernah";
-  const d = new Date(s);
-  if (isNaN(d.getTime())) return "Belum pernah";
-  return d.toLocaleString("id-ID", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }
 
 export default async function DesaDetailPage({
@@ -54,22 +41,6 @@ export default async function DesaDetailPage({
       )
       .get(slug) as { c: number }
   ).c;
-
-  // Nilai status di DB: 'ok' (ditulis syncDesa & push API), 'failed', atau null.
-  // 'success' ditoleransi untuk kompatibilitas data lama.
-  const isOk = desa.last_sync_status === "ok" || desa.last_sync_status === "success";
-  const isFailed = !!desa.last_sync_at && !isOk;
-  const statusLabel = isOk
-    ? "Sinkron sukses"
-    : isFailed
-      ? "Sinkron gagal"
-      : "Belum disinkron";
-
-  const statusColor = isOk
-    ? "bg-[var(--color-accent)]/10 text-[var(--color-accent)] border-[var(--color-accent)]/30"
-    : isFailed
-      ? "bg-[var(--color-destructive)]/10 text-[var(--color-destructive)] border-[var(--color-destructive)]/30"
-      : "bg-[var(--color-warning)]/10 text-[var(--color-warning)] border-[var(--color-warning)]/30";
 
   return (
     <>
@@ -103,25 +74,15 @@ export default async function DesaDetailPage({
                   Desa · Kecamatan Banjarmangu
                 </div>
               </div>
-              <h1 className="font-serif text-4xl sm:text-5xl font-bold leading-tight mb-3 !text-white">
+              <h1 className="font-serif text-4xl sm:text-5xl font-bold leading-tight mb-2 !text-white">
                 Desa {desa.nama}
               </h1>
-              <a
-                href={desa.website}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-sm text-white/80 hover:text-white"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                  <polyline points="15 3 21 3 21 9" />
-                  <line x1="10" y1="14" x2="21" y2="3" />
-                </svg>
-                {new URL(desa.website).hostname}
-              </a>
+              <p className="text-sm text-white/80">
+                Kecamatan Banjarmangu, Kabupaten Banjarnegara
+              </p>
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-3">
               <div className="rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 px-4 py-3">
                 <div className="font-serif text-2xl font-bold leading-none">
                   {total}
@@ -157,8 +118,6 @@ export default async function DesaDetailPage({
 
       {/* Content */}
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
-        
-
         <DesaPerangkatSection perangkat={perangkatItems} />
 
         <div className="flex items-end justify-between mb-6">
@@ -188,11 +147,8 @@ export default async function DesaDetailPage({
 
         {artikel.length === 0 ? (
           <div className="rounded-2xl border-2 border-dashed border-[var(--color-border)] bg-white p-12 text-center">
-            <p className="text-[var(--color-muted-foreground)] mb-1">
-              Belum ada artikel untuk desa ini.
-            </p>
-            <p className="text-xs text-[var(--color-muted-foreground)]">
-              Jalankan sinkronisasi untuk menarik artikel dari {new URL(desa.website).hostname}.
+            <p className="text-[var(--color-muted-foreground)]">
+              Belum ada artikel publikasi terbaru dari Desa {desa.nama}.
             </p>
           </div>
         ) : (

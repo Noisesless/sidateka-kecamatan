@@ -119,7 +119,7 @@ export default async function AnalitikDesaPage({ params }: { params: Promise<Par
       </nav>
       <h1 className="text-2xl font-bold text-[var(--color-foreground)]">Analitik Desa {desa.nama}</h1>
       <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
-        Data kependudukan disalin otomatis dari situs resmi desa (OpenSID) saat sinkronisasi.
+        Data kependudukan bersumber dari publikasi data resmi desa.
         {desa.statistik_at && (
           <>
             {" "}
@@ -157,14 +157,14 @@ export default async function AnalitikDesaPage({ params }: { params: Promise<Par
           value={perangkat.length > 0 ? String(perangkat.length) : "—"}
           sub={perangkat.length > 0 ? "perangkat terdata" : undefined}
         />
-        <SummaryCard label="Berita Tersalin" value={fmtNum(totalBerita)} sub="artikel di portal" />
+        <SummaryCard label="Publikasi Artikel" value={fmtNum(totalBerita)} sub="artikel di portal" />
       </div>
 
       {!adaStatistik && (
         <div className="mt-6 rounded-2xl border border-dashed border-[var(--color-border)] bg-white p-8 text-center">
           <p className="text-[var(--color-muted-foreground)]">
             Data statistik kependudukan desa ini belum tersedia — situs desa belum mempublikasikannya
-            atau situs tidak dapat diakses saat sinkronisasi terakhir.
+            atau sedang dalam proses pemutakhiran data.
           </p>
         </div>
       )}
