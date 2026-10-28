@@ -3,6 +3,8 @@ import { ensureInitialized } from '@/lib/init';
 import { syncAllDesa, syncDesa } from '@/lib/sync';
 import { db, type Desa } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
+import { clearStatistikCache } from '@/lib/statistik';
+import { revalidatePath } from 'next/cache';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 600; // 10 menit, fallback kalau maxDuration di server action kena timeout
@@ -37,9 +39,31 @@ export async function POST(req: NextRequest) {
       db.prepare(
         "UPDATE desa SET last_sync_at = datetime('now'), last_sync_status = ?, last_sync_message = ? WHERE id = ?",
       ).run(result.status, result.message, desa.id);
+      clearStatistikCache();
+      try {
+        revalidatePath('/statistik');
+        revalidatePath('/statistik/pendidikan');
+        revalidatePath('/statistik/kesehatan');
+        revalidatePath('/statistik/anggaran-dan-realisasi');
+        revalidatePath('/statistik/program-dan-bantuan');
+        revalidatePath('/analitik');
+        revalidatePath(`/desa/${desa.slug}`);
+        revalidatePath(`/desa/${desa.slug}/analitik`);
+        revalidatePath('/');
+      } catch {}
       return { ok: true, result, desaNama: desa.nama, desaSlug: desa.slug };
     }
     const results = await syncAllDesa();
+    clearStatistikCache();
+    try {
+      revalidatePath('/statistik');
+      revalidatePath('/statistik/pendidikan');
+      revalidatePath('/statistik/kesehatan');
+      revalidatePath('/statistik/anggaran-dan-realisasi');
+      revalidatePath('/statistik/program-dan-bantuan');
+      revalidatePath('/analitik');
+      revalidatePath('/');
+    } catch {}
     return {
       ok: true,
       summary: {

@@ -42,6 +42,14 @@ export default async function DesaDetailPage({
       .get(slug) as { c: number }
   ).c;
 
+  const totalPenduduk = (
+    db
+      .prepare(
+        "SELECT COALESCE(SUM(jumlah), 0) AS j FROM statistik_desa WHERE desa_id = ? AND kategori = 'jenis_kelamin' AND nama NOT IN ('JUMLAH', 'TOTAL', 'BELUM MENGISI')",
+      )
+      .get(desa.id) as { j: number }
+  ).j;
+
   return (
     <>
       {/* Header */}
@@ -91,6 +99,36 @@ export default async function DesaDetailPage({
                   Artikel
                 </div>
               </div>
+              {totalPenduduk > 0 && (
+                <div className="rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 px-4 py-3">
+                  <div className="font-serif text-2xl font-bold leading-none">
+                    {totalPenduduk.toLocaleString("id-ID")}
+                  </div>
+                  <div className="text-[10px] uppercase tracking-widest text-white/70 font-semibold mt-1">
+                    Penduduk
+                  </div>
+                </div>
+              )}
+              {totalPenduduk > 0 && (
+                <Link
+                  href={`/desa/${desa.slug}/analitik`}
+                  className="inline-flex items-center gap-2 rounded-xl bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20 px-4 py-3 text-white transition-colors"
+                >
+                  <div>
+                    <div className="text-xs font-bold uppercase tracking-wider text-white flex items-center gap-1.5">
+                      Statistik & Analitik
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                        <polyline points="15 3 21 3 21 9" />
+                        <line x1="10" y1="14" x2="21" y2="3" />
+                      </svg>
+                    </div>
+                    <div className="text-xs text-white/80 font-sans mt-0.5">
+                      Demografi Desa →
+                    </div>
+                  </div>
+                </Link>
+              )}
               <a
                 href={desa.website}
                 target="_blank"

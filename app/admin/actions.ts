@@ -14,7 +14,7 @@ import {
   SESSION_TTL,
 } from "@/lib/auth";
 import { syncDesa, syncAllDesa } from "@/lib/sync";
-import { scrapeAllStatistik } from "@/lib/statistik";
+import { scrapeAllStatistik, clearStatistikCache } from "@/lib/statistik";
 import { STATUS_ADUAN, getBeritaById, getBeritaFotos, slugifyBerita } from "@/lib/queries";
 import { saveUploadedImage, deleteUploadedImage } from "@/lib/upload";
 import type { Desa } from "@/lib/db";
@@ -104,18 +104,33 @@ export async function triggerSyncAction(formData: FormData) {
         redirect(`/admin?error=${encodeURIComponent("Desa tidak ditemukan")}`);
       }
       const result = await syncDesa(desa);
+      clearStatistikCache();
       revalidatePath("/");
       revalidatePath("/artikel");
+      revalidatePath("/statistik");
+      revalidatePath("/statistik/pendidikan");
+      revalidatePath("/statistik/kesehatan");
+      revalidatePath("/statistik/anggaran-dan-realisasi");
+      revalidatePath("/statistik/program-dan-bantuan");
+      revalidatePath("/analitik");
       revalidatePath(`/desa/${slug}`);
+      revalidatePath(`/desa/${slug}/analitik`);
       revalidatePath("/admin");
       const msg = `Sinkron ${desa.nama}: ${result.status}${result.newCount ? ` · +${result.newCount} baru` : ""}${result.updatedCount ? ` · ${result.updatedCount} update` : ""}`;
       redirect(`/admin?message=${encodeURIComponent(msg)}`);
     }
     const results = await syncAllDesa();
+    clearStatistikCache();
     const success = results.filter((r) => r.result.status === "ok").length;
     const total = results.reduce((s, r) => s + r.result.newCount, 0);
     revalidatePath("/");
     revalidatePath("/artikel");
+    revalidatePath("/statistik");
+    revalidatePath("/statistik/pendidikan");
+    revalidatePath("/statistik/kesehatan");
+    revalidatePath("/statistik/anggaran-dan-realisasi");
+    revalidatePath("/statistik/program-dan-bantuan");
+    revalidatePath("/analitik");
     revalidatePath("/admin");
     redirect(
       `/admin?message=${encodeURIComponent(
