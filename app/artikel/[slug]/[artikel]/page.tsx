@@ -15,6 +15,23 @@ const USER_AGENT =
   "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 " +
   "(PortalKecamatanBanjarmangu/1.0)";
 
+function decodeEntities(s: string | null): string {
+  if (!s) return "";
+  return s
+    .replace(/&amp;/g, "&")
+    .replace(/&mdash;/g, "—")
+    .replace(/&ndash;/g, "–")
+    .replace(/&hellip;/g, "…")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;|&apos;|&rsquo;/g, "'")
+    .replace(/&lsquo;/g, "'")
+    .replace(/&rdquo;/g, '"')
+    .replace(/&ldquo;/g, '"')
+    .replace(/&gt;/g, ">")
+    .replace(/&lt;/g, "<");
+}
+
 function stripHtml(html: string): string {
   return html
     .replace(/<style[\s\S]*?<\/style>/gi, "")
@@ -133,7 +150,7 @@ export async function generateMetadata({ params }: { params: Promise<Params> }) 
   if (!a) return { title: "Artikel tidak ditemukan" };
   return {
     title: a.judul,
-    description: a.ringkasan ?? a.judul,
+    description: decodeEntities(a.ringkasan ?? a.judul),
     openGraph: {
       title: a.judul,
       description: a.ringkasan ?? a.judul,
@@ -184,9 +201,13 @@ export default async function ArtikelDetailPage({
     }
   }
 
-  // Clean konten: remove any leftover "Share this article" section from older scrapes
-  if (konten) {
-    const $clean = cheerio.load(konten);
+  // Bersihkan dan format ringkasan & konten
+  const cleanRingkasan = decodeEntities(ringkasan);
+  let cleanKonten = konten ? decodeEntities(konten) : "";
+
+  if (cleanKonten) {
+    const $clean = cheerio.load(cleanKonten);
+    // Hapus widget sosial / tombol share bawaan dari tema OpenSID/WordPress
     $clean("[class*='share'], [class*='Share'], [id*='share'], .social-share, .share-buttons, .share-this").remove();
     $clean(":contains('Share this article')").each((_i, el) => {
       const $el = $clean(el);
@@ -194,8 +215,37 @@ export default async function ArtikelDetailPage({
         $el.remove();
       }
     });
-    konten = $clean.html()?.trim() || konten;
+
+    // Hapus gambar utama di awal konten jika foto utama (a.gambar) sudah ditampilkan di hero banner.
+    // Ini menghilangkan redundansi foto ganda dan mencegah ikon gambar rusak (broken image)
+    // akibat hotlink protection / WAF server desa.
+    if (a.gambar) {
+      const $firstImg = $clean("img").first();
+      if ($firstImg.length) {
+        $firstImg.remove();
+      }
+    }
+
+    // Bersihkan tag pembungkus kosong yang tersisa setelah gambar dihapus
+    $clean("p, figure, div").each((_i, el) => {
+      const $el = $clean(el);
+      if (!$el.text().trim() && $el.find("img, iframe, table").length === 0) {
+        $el.remove();
+      }
+    });
+
+    cleanKonten = $clean("body").html()?.trim() || "";
   }
+
+  const strippedKonten = cleanKonten ? stripHtml(cleanKonten) : "";
+  const strippedRingkasan = cleanRingkasan ? stripHtml(cleanRingkasan) : "";
+
+  // Cek apakah konten hanya berupa ringkasan pendek / kutipan cuplikan RSS
+  const isExcerptOnly =
+    !cleanKonten ||
+    strippedKonten.endsWith("[...]") ||
+    strippedKonten.length <= 320 ||
+    strippedKonten.replace(/\s+/g, "") === strippedRingkasan.replace(/\s+/g, "");
 
   // Related: same desa
   const related = getRecentArtikel(4, slug).filter((x) => x.id !== a.id).slice(0, 3);
@@ -230,12 +280,6 @@ export default async function ArtikelDetailPage({
           <h1 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold leading-tight tracking-tight mb-5 drop-shadow-lg text-white !text-white">
             {a.judul}
           </h1>
-
-          {ringkasan && (
-            <p className="text-lg sm:text-xl text-white/80 leading-relaxed max-w-3xl">
-              {ringkasan}
-            </p>
-          )}
 
           <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-white/70 border-t border-white/15 pt-4">
             {a.penulis && (
@@ -280,41 +324,41 @@ export default async function ArtikelDetailPage({
         </div>
       )}
 
-      {/* Content - ringkasan + konten + link ke sumber asli */}
-      <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
-        {/* Ringkasan / Konten artikel */}
-        {ringkasan ? (
-          <div className="mb-8">
-            <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-muted-foreground)] mb-3 flex items-center gap-1.5">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="17" y1="10" x2="3" y2="10" />
-                <line x1="21" y1="6" x2="3" y2="6" />
-                <line x1="21" y1="14" x2="3" y2="14" />
-                <line x1="17" y1="18" x2="3" y2="18" />
-              </svg>
-              Ringkasan Artikel
-            </div>
-            <p className="text-base sm:text-lg text-[var(--color-foreground)] leading-relaxed whitespace-pre-line">
-              {ringkasan}
-            </p>
-          </div>
-        ) : null}
-
-        {/* Konten HTML lengkap dari scrape (jika ada) */}
-        {konten ? (
-          <div className="mb-8 rounded-2xl border border-[var(--color-border)] bg-white p-6 sm:p-7">
+      {/* Content - konten artikel / ringkasan resmi tanpa duplikasi */}
+      <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
+        {/* Jika artikel memiliki konten utuh (bukan sekadar ringkasan pendek) */}
+        {!isExcerptOnly && cleanKonten ? (
+          <div className="mb-10 rounded-2xl border border-[var(--color-border)] bg-white p-6 sm:p-9 shadow-xs">
             <div
-              className="prose-article text-[var(--color-foreground)] leading-relaxed"
-              dangerouslySetInnerHTML={{ __html: konten }}
+              className="prose-article text-[var(--color-foreground)] leading-relaxed text-base sm:text-lg"
+              dangerouslySetInnerHTML={{ __html: cleanKonten }}
             />
           </div>
         ) : null}
 
-        {/* Pesan jika tidak ada ringkasan dan konten */}
-        {!ringkasan && !konten ? (
+        {/* Jika artikel hanya memiliki ringkasan / cuplikan RSS */}
+        {isExcerptOnly && (cleanRingkasan || strippedKonten) ? (
+          <div className="mb-8 rounded-2xl border border-[var(--color-border)] bg-[var(--color-muted)]/20 p-6 sm:p-8">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--color-primary)] mb-3 flex items-center gap-2">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="21" y1="10" x2="3" y2="10" />
+                <line x1="21" y1="6" x2="3" y2="6" />
+                <line x1="21" y1="14" x2="3" y2="14" />
+                <line x1="17" y1="18" x2="3" y2="18" />
+              </svg>
+              <span>Ringkasan Berita Resmi</span>
+            </div>
+            <p className="text-base sm:text-lg text-[var(--color-foreground)] leading-relaxed whitespace-pre-line font-serif">
+              {cleanRingkasan || strippedKonten}
+            </p>
+          </div>
+        ) : null}
+
+        {/* Pesan jika tidak ada konten sama sekali */}
+        {!cleanRingkasan && !cleanKonten ? (
           <div className="mb-8 rounded-2xl border border-[var(--color-border)] bg-[var(--color-muted)]/40 p-6 text-center">
             <p className="text-sm text-[var(--color-muted-foreground)]">
-              Ringkasan artikel belum tersedia. Silakan buka artikel asli untuk membaca konten lengkap.
+              Konten artikel belum tersedia. Silakan buka artikel asli untuk membaca konten lengkap.
             </p>
           </div>
         ) : null}
@@ -395,12 +439,14 @@ export default async function ArtikelDetailPage({
             </div>
 
             <h2 className="font-serif text-2xl sm:text-3xl font-bold leading-tight mb-3 !text-white">
-              Baca artikel lengkap di situs Desa {a.desa.nama}
+              {isExcerptOnly
+                ? `Baca artikel lengkap di situs Desa ${a.desa.nama}`
+                : `Kunjungi sumber asli di situs Desa ${a.desa.nama}`}
             </h2>
             <p className="text-sm sm:text-base text-white/80 leading-relaxed mb-6 max-w-2xl !text-white/80">
-              Portal Kecamatan Banjarmangu hanya menampilkan ringkasan artikel.
-              Untuk membaca konten lengkap, silakan kunjungi website resmi
-              Desa {a.desa.nama}.
+              {isExcerptOnly
+                ? `Portal Sidateka menampilkan ringkasan berita resmi. Untuk membaca rincian selengkapnya, silakan kunjungi website resmi Desa ${a.desa.nama}.`
+                : `Artikel ini dipublikasikan oleh Pemerintah Desa ${a.desa.nama}. Anda dapat mengunjungi website resmi desa untuk melihat informasi dan publikasi lainnya.`}
             </p>
 
             <a

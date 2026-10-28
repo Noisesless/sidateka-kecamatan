@@ -352,7 +352,7 @@ async function fetchRss(desa: Desa): Promise<Artikel[]> {
   const feed = await parser.parseString(xml);
   const items: Artikel[] = [];
   for (const it of feed.items ?? []) {
-    const judul = (it.title || '').trim();
+    const judul = decodeEntities((it.title || '').trim());
     const url = (it.link || '').trim();
     if (!judul || !url) continue;
     const slug = slugify(judul) || slugify(url);

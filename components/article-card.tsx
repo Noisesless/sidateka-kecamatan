@@ -4,6 +4,23 @@ import type { ArtikelWithDesa } from "@/lib/queries";
 
 type Variant = "default" | "featured" | "compact";
 
+function decodeEntities(s: string | null): string {
+  if (!s) return "";
+  return s
+    .replace(/&amp;/g, "&")
+    .replace(/&mdash;/g, "—")
+    .replace(/&ndash;/g, "–")
+    .replace(/&hellip;/g, "…")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;|&apos;|&rsquo;/g, "'")
+    .replace(/&lsquo;/g, "'")
+    .replace(/&rdquo;/g, '"')
+    .replace(/&ldquo;/g, '"')
+    .replace(/&gt;/g, ">")
+    .replace(/&lt;/g, "<");
+}
+
 function formatDate(s: string | null): string {
   if (!s) return "";
   const d = new Date(s);
@@ -67,7 +84,7 @@ export function ArticleCard({
           </h2>
           {artikel.ringkasan && (
             <p className="mt-3 text-[15px] text-[var(--color-muted-foreground)] line-clamp-3 leading-relaxed">
-              {artikel.ringkasan}
+              {decodeEntities(artikel.ringkasan)}
             </p>
           )}
           <div className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--color-primary)]">
@@ -139,7 +156,7 @@ export function ArticleCard({
         </h3>
         {artikel.ringkasan && (
           <p className="text-[13px] text-[var(--color-muted-foreground)] line-clamp-2 leading-relaxed mb-3">
-            {artikel.ringkasan}
+            {decodeEntities(artikel.ringkasan)}
           </p>
         )}
         <div className="mt-auto flex items-center justify-between text-[11px] text-[var(--color-muted-foreground)]">

@@ -2,6 +2,23 @@ import Link from "next/link";
 import { SafeImage } from "@/components/safe-image";
 import type { ArtikelWithDesa } from "@/lib/queries";
 
+function decodeEntities(s: string | null): string {
+  if (!s) return "";
+  return s
+    .replace(/&amp;/g, "&")
+    .replace(/&mdash;/g, "—")
+    .replace(/&ndash;/g, "–")
+    .replace(/&hellip;/g, "…")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;|&apos;|&rsquo;/g, "'")
+    .replace(/&lsquo;/g, "'")
+    .replace(/&rdquo;/g, '"')
+    .replace(/&ldquo;/g, '"')
+    .replace(/&gt;/g, ">")
+    .replace(/&lt;/g, "<");
+}
+
 function formatDate(s: string | null): string {
   if (!s) return "";
   const d = new Date(s);
@@ -71,7 +88,7 @@ export function ArticleRowCard({ artikel }: { artikel: ArtikelWithDesa }) {
 
           {artikel.ringkasan && (
             <p className="text-sm text-[var(--color-muted-foreground)] line-clamp-3 leading-relaxed mb-3">
-              {artikel.ringkasan}
+              {decodeEntities(artikel.ringkasan)}
             </p>
           )}
 
