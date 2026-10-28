@@ -41,6 +41,17 @@ const KEPALA_DESA: Record<string, string> = {
 
 type StyleKey = "liberty" | "positron" | "satelit";
 
+interface StyleOption {
+  key: StyleKey;
+  label: string;
+}
+
+const STYLE_OPTIONS: StyleOption[] = [
+  { key: "liberty", label: "Elegan" },
+  { key: "positron", label: "Terang" },
+  { key: "satelit", label: "Satelit" },
+];
+
 interface SatelliteStyleSource {
   type: "raster";
   tiles: string[];
@@ -164,6 +175,24 @@ export default function PetaBanjarmangu() {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<maplibregl.Map | null>(null);
   const [activeStyle, setActiveStyle] = useState<StyleKey>("liberty");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
+
+  // Tutup dropdown mobile style chooser jika pengguna mengklik di luar area
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target as Node)) {
+        setMobileMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
+  }, [mobileMenuOpen]);
 
   const dataRef = useRef<{
     kec: GeoJSON.FeatureCollection;
@@ -412,41 +441,107 @@ export default function PetaBanjarmangu() {
 
   return (
     <div className="relative w-full rounded-xl border border-[var(--color-border)] overflow-hidden shadow-sm">
-      {/* Switcher Layer Peta Elegan */}
-      <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5 p-1 rounded-lg bg-white/95 backdrop-blur-md border border-blue-200 shadow-md">
-        <button
-          type="button"
-          onClick={() => switchStyle("liberty")}
-          className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
-            activeStyle === "liberty"
-              ? "bg-[#1e40af] text-white shadow-sm"
-              : "text-slate-600 hover:text-blue-900 hover:bg-blue-50"
-          }`}
-        >
-          Elegan (Liberty)
-        </button>
-        <button
-          type="button"
-          onClick={() => switchStyle("positron")}
-          className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
-            activeStyle === "positron"
-              ? "bg-[#1e40af] text-white shadow-sm"
-              : "text-slate-600 hover:text-blue-900 hover:bg-blue-50"
-          }`}
-        >
-          Terang (Positron)
-        </button>
-        <button
-          type="button"
-          onClick={() => switchStyle("satelit")}
-          className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
-            activeStyle === "satelit"
-              ? "bg-[#1e40af] text-white shadow-sm"
-              : "text-slate-600 hover:text-blue-900 hover:bg-blue-50"
-          }`}
-        >
-          Citra Satelit
-        </button>
+      {/* Switcher Layer Peta (Desktop: Horizontal Pills, Mobile: Compact Dropdown) */}
+      <div className="absolute top-3 right-3 z-10" ref={mobileMenuRef}>
+        {/* Desktop View (>= 640px) */}
+        <div className="hidden sm:flex items-center gap-1.5 p-1 rounded-lg bg-white/95 backdrop-blur-md border border-blue-200 shadow-md">
+          {STYLE_OPTIONS.map((opt) => (
+            <button
+              key={opt.key}
+              type="button"
+              onClick={() => switchStyle(opt.key)}
+              className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+                activeStyle === opt.key
+                  ? "bg-[#1e40af] text-white shadow-sm"
+                  : "text-slate-600 hover:text-blue-900 hover:bg-blue-50"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Mobile View (< 640px): Compact Layer Chooser */}
+        <div className="sm:hidden relative">
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen((prev) => !prev)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/95 backdrop-blur-md border border-blue-200 shadow-md text-xs font-semibold text-[#1e40af] active:bg-blue-50 transition-all cursor-pointer"
+            aria-label="Pilih gaya tampilan peta"
+            aria-expanded={mobileMenuOpen}
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="text-[#1e40af] flex-shrink-0"
+            >
+              <path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z" />
+              <path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65" />
+              <path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65" />
+            </svg>
+            <span className="font-semibold">
+              {STYLE_OPTIONS.find((s) => s.key === activeStyle)?.label}
+            </span>
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={`text-slate-400 transition-transform duration-200 flex-shrink-0 ${
+                mobileMenuOpen ? "rotate-180" : ""
+              }`}
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+
+          {mobileMenuOpen && (
+            <div className="absolute right-0 top-full mt-1.5 w-32 py-1 rounded-lg bg-white/98 backdrop-blur-md border border-blue-200 shadow-lg z-30 flex flex-col gap-0.5">
+              {STYLE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => {
+                    switchStyle(opt.key);
+                    setMobileMenuOpen(false);
+                  }}
+                  className={`flex items-center justify-between px-3 py-1.5 text-xs text-left transition-colors cursor-pointer ${
+                    activeStyle === opt.key
+                      ? "bg-blue-50 text-[#1e40af] font-bold"
+                      : "text-slate-700 hover:bg-slate-50 font-medium"
+                  }`}
+                >
+                  <span>{opt.label}</span>
+                  {activeStyle === opt.key && (
+                    <svg
+                      width="13"
+                      height="13"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#1e40af"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="flex-shrink-0"
+                    >
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Map Canvas */}
@@ -456,16 +551,16 @@ export default function PetaBanjarmangu() {
       />
 
       {/* Legenda Wilayah */}
-      <div className="absolute bottom-3 right-3 z-10 p-3 rounded-lg bg-white/95 backdrop-blur-md border border-blue-200 shadow-md font-sans">
-        <div className="font-serif text-xs font-bold text-[#1e3a8a] mb-1.5 tracking-tight">
+      <div className="absolute bottom-3 right-3 z-10 p-2.5 sm:p-3 rounded-lg bg-white/95 backdrop-blur-md border border-blue-200 shadow-md font-sans pointer-events-none">
+        <div className="font-serif text-[11px] sm:text-xs font-bold text-[#1e3a8a] mb-1 sm:mb-1.5 tracking-tight">
           Kec. Banjarmangu
         </div>
-        <div className="flex items-center gap-2 mb-1 text-[11px] text-slate-700 font-medium">
-          <span className="inline-block w-4 h-3 border-2 border-dashed border-[#1e40af] bg-blue-500/10 rounded-sm" />
+        <div className="flex items-center gap-1.5 sm:gap-2 mb-1 text-[10px] sm:text-[11px] text-slate-700 font-medium">
+          <span className="inline-block w-3.5 h-2.5 sm:w-4 sm:h-3 border-2 border-dashed border-[#1e40af] bg-blue-500/10 rounded-sm" />
           <span>Batas Kecamatan</span>
         </div>
-        <div className="flex items-center gap-2 text-[11px] text-slate-700 font-medium">
-          <span className="inline-block w-4 h-3 bg-[#2563eb] border border-white rounded-sm opacity-70" />
+        <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-[11px] text-slate-700 font-medium">
+          <span className="inline-block w-3.5 h-2.5 sm:w-4 sm:h-3 bg-[#2563eb] border border-white rounded-sm opacity-70" />
           <span>Wilayah Desa</span>
         </div>
       </div>
