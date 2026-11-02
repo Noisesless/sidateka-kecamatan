@@ -14,13 +14,17 @@ Dokumen ini adalah Single Source of Truth (SSOT) untuk prosedur instalasi awal, 
 - **Port Produksi:** `3010`
 - **Process Manager:** PM2 (dipasang di lokal user `~/.npm-global/bin/pm2`)
 - **Process Name:** `sidateka` (Process ID: `0`)
-- **Node.js Runtime:** `v24.22.0`
+- **Node.js Runtime:** `v24.22.1`
 - **Next.js Engine:** `16.4.2` (Turbopack, Patched Release)
 - **Repository GitHub:** `https://github.com/Noisesless/sidateka-kecamatan.git` (Branch: `main`)
 - **Database & Uploads Persistence:**
   - Database: `.data/portal.db` (SQLite WAL mode)
   - Foto Berita & Perangkat: `.data/uploads/sync/`
   - *Folder `.data/` dan file `.env` diabaikan oleh Git via `.gitignore` sehingga tidak akan terhapus saat update.*
+- **Nginx Edge Hardening (2026-11-02):**
+  - HSTS: `Strict-Transport-Security "max-age=31536000; includeSubDomains" always;`
+  - Blokir Dotfiles: `location ~ /\.(?!well-known) { deny all; return 404; }`
+  - Blokir Berkas Sensitif: `location ~* /(package\.json|package-lock\.json|tsconfig\.json|\.data|init-env\.sh|deploy\.sh) { deny all; return 404; }`
 
 ---
 

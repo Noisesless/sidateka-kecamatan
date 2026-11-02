@@ -7,10 +7,10 @@
 | Git Anchor | `e86ac7d` -> Remediated |
 | Stack | Next.js ^16.4.2 (App Router) + better-sqlite3 (WAL Mode) + Tailwind CSS v4 |
 | Scan Mode | Factual Hybrid (Static Analysis + Dependency Audit + Grep FSEP) |
-| Total Berkas Diperiksa | 54 berkas kode (`app/*`, `lib/*`, `components/*`) |
+| Total Berkas Diperiksa | 54 berkas kode (`app/*`, `lib/*`, `components/*`) + Konfigurasi Nginx VPS |
 | Anti-Stale Marker | ✅ [ANTI-STALE] verified |
 | Auditor | AI Vibes Coding Agent |
-| Status Akhir | 🟢 **ALL 10 SECURITY PATTERNS REMEDIATED & SECURED (PASSED)** |
+| Status Akhir | 🟢 **ALL 10 SECURITY PATTERNS + NGINX EDGE HARDENING (PASSED)** |
 
 ---
 
@@ -49,3 +49,17 @@
 6. **[lib/sync.ts](file:///d:/Project/sidateka-main/lib/sync.ts) & [app/artikel/[slug]/[artikel]/page.tsx](file:///d:/Project/sidateka-main/app/artikel/[slug]/[artikel]/page.tsx):**
    - Menghubungkan `isSafePublicUrl` sebelum mengunduh gambar remote atau mengambil konten on-the-fly.
    - Memfilter dan membersihkan seluruh konten artikel melalui `sanitizeHtmlContent` sebelum disimpan ke basis data SQLite dan sebelum ditampilkan ke pengunjung.
+
+---
+
+## 3. Audit Infrastruktur Produksi & Nginx Edge Hardening (2026-11-02)
+
+| Aspek Keamanan | Verifikasi Faktual | Status |
+|---|---|---|
+| **Nginx HSTS** | `Strict-Transport-Security "max-age=31536000; includeSubDomains" always;` diaktifkan di vhost produksi `/etc/nginx/sites-enabled/sidateka.banjarmangu.banjarnegarakab.go.id.conf`. | ✅ PASSED |
+| **Dotfiles Protection** | Blok Nginx `location ~ /\.(?!well-known) { deny all; return 404; }` langsung menolak akses ke `/.env`, `/.git`, `/.gitignore` di edge (0ms). | ✅ PASSED |
+| **Metadata Protection** | Blok Nginx `location ~* /(package\.json|package-lock\.json|tsconfig\.json|\.data|init-env\.sh|deploy\.sh) { deny all; return 404; }`. | ✅ PASSED |
+| **Permission File `.env`** | Terverifikasi `600` (`-rw-------`) milik user `sidateka-bjmangu-01`. Hanya pemilik proses yang dapat membaca. | ✅ PASSED |
+| **Status `.htaccess`** | Server menggunakan Nginx murni (CloudPanel reverse proxy ke Node.js), tidak ada file `.htaccess` dan tidak digunakan (arsitektur tepat). | ✅ PASSED |
+| **Database Concurrency & Isolation** | File `.data/portal.db` tersimpan di luar folder publik dengan mode WAL (`busy_timeout = 30000`). Direct HTTP access mengembalikan 404. | ✅ PASSED |
+| **SSL/TLS Status** | Sertifikat Let's Encrypt aktif, HTTP/2 200 OK, terverifikasi valid hingga 24 Januari 2027. | ✅ PASSED |
