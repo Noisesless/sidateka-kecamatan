@@ -1,3 +1,4 @@
+import { formatDateWib } from "@/lib/date";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import * as cheerio from "cheerio";
@@ -52,18 +53,7 @@ export async function generateMetadata({ params }: { params: Promise<Params> }) 
   };
 }
 
-function formatDate(s: string | null): string {
-  if (!s) return "";
-  const d = new Date(s);
-  if (isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("id-ID", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+const formatDate = formatDateWib;
 
 export default async function ArtikelDetailPage({
   params,

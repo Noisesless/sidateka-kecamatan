@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getArtikelStats, getAllDesa } from "@/lib/queries";
+import { formatDateTimeWib } from "@/lib/date";
 
 export const dynamic = "force-dynamic";
 
@@ -87,7 +88,7 @@ export default function TentangPage() {
         </div>
         <div className="rounded-xl border border-[var(--color-border)] bg-white p-4">
           <div className="font-serif text-2xl font-bold text-[var(--color-primary)]">
-            {stats.lastSync ? new Date(stats.lastSync).toLocaleDateString("id-ID", { day: "2-digit", month: "short" }) : "—"}
+            {stats.lastSync ? formatDateTimeWib(stats.lastSync, { day: "2-digit", month: "short" }) : "—"}
           </div>
           <div className="text-[11px] uppercase tracking-widest text-[var(--color-muted-foreground)] font-semibold mt-1">Pembaruan Terakhir</div>
         </div>

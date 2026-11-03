@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getAduanByNomor } from "@/lib/queries";
+import { formatDateTimeWib } from "@/lib/date";
 
 export const metadata: Metadata = {
   title: "Lacak Aduan",
@@ -32,14 +33,7 @@ const STATUS_STYLE: Record<string, { label: string; cls: string; desc: string }>
 };
 
 function formatTanggal(iso: string): string {
-  return new Date(iso.replace(" ", "T") + "Z").toLocaleString("id-ID", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "Asia/Jakarta",
-  });
+  return formatDateTimeWib(iso, { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 export default async function LacakAduanPage({

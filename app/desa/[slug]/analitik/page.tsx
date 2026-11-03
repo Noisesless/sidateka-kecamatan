@@ -6,6 +6,7 @@ import { getKecamatanPenduduk } from "@/lib/opendata";
 import { BarList, Donut, Pyramid, fmtNum } from "@/components/analitik-charts";
 import { db } from "@/lib/db";
 import type { StatistikDesa } from "@/lib/db";
+import { formatDateTimeWib } from "@/lib/date";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -124,13 +125,7 @@ export default async function AnalitikDesaPage({ params }: { params: Promise<Par
           <>
             {" "}
             Pembaruan terakhir:{" "}
-            {new Date(desa.statistik_at.replace(" ", "T")).toLocaleString("id-ID", {
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
+            {formatDateTimeWib(desa.statistik_at)}
             .
           </>
         )}

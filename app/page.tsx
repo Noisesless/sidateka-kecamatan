@@ -1,3 +1,4 @@
+import { formatDateWib } from "@/lib/date";
 import Link from "next/link";
 import { db } from "@/lib/db";
 import {
@@ -23,16 +24,7 @@ import { getVisitorStats } from "@/lib/visitor";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-function formatTanggal(s: string | null): string {
-  if (!s) return "";
-  const d = new Date(s);
-  if (isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("id-ID", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-}
+const formatTanggal = formatDateWib;
 
 export default async function HomePage(props: {
   searchParams?: Promise<{ page?: string }>;

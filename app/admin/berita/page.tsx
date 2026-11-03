@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { getAllBeritaAdmin, getBeritaFotos, KATEGORI_BERITA } from "@/lib/queries";
+import { formatDateWib } from "@/lib/date";
 import {
   logoutAction,
   createBeritaAction,
@@ -22,11 +23,7 @@ type SearchParams = {
 
 function formatTanggal(iso: string): string {
   try {
-    return new Date(iso.replace(" ", "T") + "Z").toLocaleDateString("id-ID", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
+    return formatDateWib(iso);
   } catch {
     return iso;
   }

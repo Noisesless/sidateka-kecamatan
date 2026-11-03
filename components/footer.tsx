@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getAllDesa, getArtikelStats } from "@/lib/queries";
 import { NAV_LINKS } from "@/lib/navigation";
+import { formatDateTimeWib } from "@/lib/date";
 
 /** Flatten nav links to top-level only (no children) for compact footer */
 const FOOTER_QUICK_LINKS = NAV_LINKS.filter((item) => !item.children || item.children.length === 0)
@@ -104,14 +105,7 @@ export function Footer() {
               <div className="flex justify-between">
                 <dt className="text-[var(--color-muted-foreground)]">Sinkron Terakhir</dt>
                 <dd className="font-semibold text-[var(--color-foreground)] text-xs">
-                  {stats.lastSync
-                    ? new Date(stats.lastSync).toLocaleString("id-ID", {
-                        day: "2-digit",
-                        month: "short",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })
-                    : "—"}
+                  {stats.lastSync ? formatDateTimeWib(stats.lastSync) : "—"}
                 </dd>
               </div>
             </dl>

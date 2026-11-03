@@ -1,31 +1,12 @@
+import { formatDateWib, timeAgoWib } from "@/lib/date";
 import Link from "next/link";
 import type { ArtikelKecamatan } from "@/lib/db";
 import { SafeImage } from "@/components/safe-image";
 
 type Variant = "default" | "compact";
 
-function formatDate(s: string | null): string {
-  if (!s) return "";
-  const d = new Date(s.includes("T") ? s : s.replace(" ", "T") + "Z");
-  if (isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("id-ID", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-}
-
-function timeAgo(s: string | null): string {
-  if (!s) return "";
-  const d = new Date(s.includes("T") ? s : s.replace(" ", "T") + "Z");
-  if (isNaN(d.getTime())) return "";
-  const diff = (Date.now() - d.getTime()) / 1000;
-  if (diff < 60) return "baru saja";
-  if (diff < 3600) return `${Math.floor(diff / 60)} mnt`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)} jam`;
-  if (diff < 604800) return `${Math.floor(diff / 86400)} hari`;
-  return formatDate(s);
-}
+const formatDate = formatDateWib;
+const timeAgo = timeAgoWib;
 
 export function BeritaCard({
   berita,

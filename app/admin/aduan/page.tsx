@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
+import { formatDateTimeWib } from "@/lib/date";
 import { getAllAduanAdmin, getAduanStats, STATUS_ADUAN } from "@/lib/queries";
 import { updateAduanAction, deleteAduanAction } from "../actions";
 
@@ -20,13 +21,7 @@ const STATUS_META: Record<string, { label: string; badge: string }> = {
 };
 
 function formatTanggal(iso: string): string {
-  return new Date(iso.replace(" ", "T") + "Z").toLocaleString("id-ID", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "Asia/Jakarta",
-  });
+  return formatDateTimeWib(iso);
 }
 
 export default async function AdminAduanPage({

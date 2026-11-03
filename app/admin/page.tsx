@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
+import { formatDateTimeWib } from "@/lib/date";
 import { getAllDesa, getArtikelStats, getRecentSyncLogs, getAduanStats } from "@/lib/queries";
 import { db } from "@/lib/db";
 import {
@@ -136,7 +137,7 @@ export default async function AdminDashboardPage({
         <StatTile label="Artikel" value={stats.totalArtikel} />
         <StatTile
           label="Sync Terakhir"
-          value={stats.lastSync ? new Date(stats.lastSync).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "—"}
+          value={stats.lastSync ? formatDateTimeWib(stats.lastSync) : "—"}
           small
         />
       </div>
@@ -215,14 +216,7 @@ export default async function AdminDashboardPage({
                     {countMap.get(d.id) ?? 0}
                   </td>
                   <td className="px-4 py-3 text-xs text-[var(--color-muted-foreground)]">
-                    {d.last_sync_at
-                      ? new Date(d.last_sync_at).toLocaleString("id-ID", {
-                          day: "2-digit",
-                          month: "short",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })
-                      : "—"}
+                    {d.last_sync_at ? formatDateTimeWib(d.last_sync_at) : "—"}
                   </td>
                   <td className="px-4 py-3">
                     <span
@@ -368,12 +362,7 @@ export default async function AdminDashboardPage({
                 className="px-5 sm:px-6 py-3 flex flex-wrap items-center gap-3 text-sm"
               >
                 <div className="font-mono text-xs text-[var(--color-muted-foreground)] w-32">
-                  {new Date(l.created_at).toLocaleString("id-ID", {
-                    day: "2-digit",
-                    month: "short",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
+                  {formatDateTimeWib(l.created_at)}
                 </div>
                 <div className="font-semibold flex-1 min-w-0 truncate">
                   {l.desa_nama ?? "—"}
